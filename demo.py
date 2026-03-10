@@ -1,76 +1,29 @@
 """
-Quick demo — runs without an API key to show anonymization in action.
-To test with a real LLM call, set OPENAI_API_KEY in .env and use PrivacyClient.
+Anonymization demo.
+
+Runs all data files in demo_data/ by default, or a specific one by name.
+
+Usage:
+    uv run python demo.py                   # run all data files
+    uv run python demo.py financial         # run demo_data/financial.py only
+    uv run python demo.py general_pii       # run demo_data/general_pii.py only
 """
+
+import importlib
+import sys
+from pathlib import Path
 
 from src.privacy_wrapper.anonymizer import Anonymizer
 
+DEMO_DATA_DIR = Path(__file__).parent / "demo_data"
 anon = Anonymizer()
 
-SECTIONS = {
-    "General PII": [
-        "Schedule a call with John Smith (john.smith@acme.com) about the Q3 financials.",
-        "The applicant's SSN is 346-12-5678 and card number is 4111-1111-1111-1111.",
-        "Server at 192.168.1.105 went down — contact bob@internal.org immediately.",
-        "What is the capital of France?",  # no PII — passes through unchanged
-    ],
 
-    "Financial & Structured": [
-        # Wire transfer
-        (
-            "Please initiate a wire transfer of $128,450.00 to:\n"
-            "Beneficiary: Eleanor Voss\n"
-            "Bank: First National Bank\n"
-            "Account: 7823901645\n"
-            "Routing: 021000021\n"
-            "Reference: INV-2024-00892"
-        ),
-        # IBAN / international payment
-        (
-            "Transfer EUR 42,000 to IBAN GB29NWBK60161331926819 "
-            "held by Marcus Heller at Barclays London. BIC: NWBKGB2L."
-        ),
-        # Loan application block
-        (
-            "Applicant Name : Christine Okoro\n"
-            "SSN            : 489-52-1736\n"
-            "Annual Income  : $97,500\n"
-            "Loan Amount    : $350,000\n"
-            "Property Addr  : 412 Elmwood Drive, Austin, TX 78701\n"
-            "Credit Score   : 748"
-        ),
-        # Invoice
-        (
-            "INVOICE #INV-20240315\n"
-            "Bill To : Thomas Reyes, treyes@reycorp.com\n"
-            "Item    : Software licence (annual)   $12,000.00\n"
-            "Item    : Support retainer (Q1)       $3,500.00\n"
-            "Total   : $15,500.00\n"
-            "Due     : 2024-04-15\n"
-            "Card on file: 5555-5555-5555-4444"
-        ),
-        # Brokerage note
-        (
-            "Account holder: Patricia Lim (pat.lim@investco.com)\n"
-            "Account no.   : 98-34521-7\n"
-            "Trade date    : 2024-03-08\n"
-            "Order         : BUY 500 shares AAPL @ $171.20\n"
-            "Settlement    : T+2 via DTC participant 0352"
-        ),
-        # Tax record
-        (
-            "Taxpayer: Gerald Hutchins\n"
-            "TIN     : 346-88-2201\n"
-            "Tax Year: 2023\n"
-            "W-2 Wages            : $134,200\n"
-            "Federal Tax Withheld : $28,600\n"
-            "Employer EIN         : 12-3456789"
-        ),
-    ],
-}
+def run_file(module_name: str) -> None:
+    mod = importlib.import_module(f"demo_data.{module_name}")
+    title = getattr(mod, "TITLE", module_name)
+    samples: list[str] = mod.SAMPLES
 
-
-def run_section(title: str, samples: list[str]) -> None:
     width = 72
     print("=" * width)
     print(f"  {title}")
@@ -85,10 +38,30 @@ def run_section(title: str, samples: list[str]) -> None:
         print(f"\nMapping: {result.mapping}")
         print(f"\nRestored:\n{restored}")
 
-        assert restored == text, f"Roundtrip failed for:\n{text}"
+        assert restored == text, f"Roundtrip failed:\n{text}"
         print("-" * width)
 
-
-for section_title, section_samples in SECTIONS.items():
-    run_section(section_title, section_samples)
     print()
+
+
+def available_files() -> list[str]:
+    return sorted(
+        p.stem for p in DEMO_DATA_DIR.glob("*.py") if p.stem != "__init__"
+    )
+
+
+def main() -> None:
+    requested = sys.argv[1] if len(sys.argv) > 1 else None
+
+    if requested:
+        if not (DEMO_DATA_DIR / f"{requested}.py").exists():
+            print(f"Unknown demo file '{requested}'. Available: {available_files()}")
+            sys.exit(1)
+        run_file(requested)
+    else:
+        for name in available_files():
+            run_file(name)
+
+
+if __name__ == "__main__":
+    main()
