@@ -8,8 +8,7 @@ Flow:
 
 from dataclasses import dataclass, field
 from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
-from presidio_anonymizer.entities import OperatorConfig
+from presidio_analyzer.recognizer_result import RecognizerResult
 
 DEFAULT_ENTITIES = [
     "PERSON",
@@ -35,6 +34,25 @@ class AnonymizationResult:
     mapping: dict[str, str] = field(default_factory=dict)
 
 
+def _resolve_overlaps(hits: list[RecognizerResult]) -> list[RecognizerResult]:
+    """
+    When two detected spans overlap, keep the one with the higher confidence
+    score. Ties are broken by preferring the longer (wider) span.
+    Runs in O(n log n).
+    """
+    # Highest score first; on equal score prefer the wider span
+    ranked = sorted(hits, key=lambda h: (h.score, h.end - h.start), reverse=True)
+    kept: list[RecognizerResult] = []
+    for candidate in ranked:
+        overlaps = any(
+            candidate.start < kept_hit.end and candidate.end > kept_hit.start
+            for kept_hit in kept
+        )
+        if not overlaps:
+            kept.append(candidate)
+    return kept
+
+
 class Anonymizer:
     def __init__(
         self,
@@ -46,7 +64,6 @@ class Anonymizer:
         self.score_threshold = score_threshold
         self.language = language
         self._analyzer = AnalyzerEngine()
-        self._anonymizer = AnonymizerEngine()
 
     def anonymize(self, text: str) -> AnonymizationResult:
         """Detect and replace PII in text. Returns anonymized text and a restore map."""
@@ -60,31 +77,32 @@ class Anonymizer:
         if not hits:
             return AnonymizationResult(anonymized_text=text)
 
-        # Build per-entity placeholder operators
-        # Use a counter so duplicate entity types get unique tags
-        operators: dict[str, OperatorConfig] = {}
+        # Drop lower-confidence spans that overlap with a higher-confidence one
+        # (e.g. URL sub-spans inside a detected EMAIL_ADDRESS).
+        hits = _resolve_overlaps(hits)
+
+        # Assign unique placeholders in left-to-right reading order so that
+        # PERSON_0 always refers to the first person mentioned, PERSON_1 the
+        # second, etc. — regardless of how many of the same entity type appear.
+        hits_by_position = sorted(hits, key=lambda h: h.start)
         counters: dict[str, int] = {}
+        span_to_placeholder: dict[tuple[int, int], str] = {}
         mapping: dict[str, str] = {}
 
-        for hit in hits:
-            entity = hit.entity_type
-            idx = counters.get(entity, 0)
-            counters[entity] = idx + 1
-            placeholder = f"<{entity}_{idx}>"
-            original = text[hit.start:hit.end]
-            mapping[placeholder] = original
-            operators[entity] = OperatorConfig("replace", {"new_value": placeholder})
+        for hit in hits_by_position:
+            idx = counters.get(hit.entity_type, 0)
+            counters[hit.entity_type] = idx + 1
+            placeholder = f"<{hit.entity_type}_{idx}>"
+            span_to_placeholder[(hit.start, hit.end)] = placeholder
+            mapping[placeholder] = text[hit.start:hit.end]
 
-        result = self._anonymizer.anonymize(
-            text=text,
-            analyzer_results=hits,
-            operators=operators,
-        )
+        # Replace spans right-to-left so earlier offsets stay valid as we go.
+        result_text = text
+        for hit in sorted(hits, key=lambda h: h.start, reverse=True):
+            placeholder = span_to_placeholder[(hit.start, hit.end)]
+            result_text = result_text[:hit.start] + placeholder + result_text[hit.end:]
 
-        return AnonymizationResult(
-            anonymized_text=result.text,
-            mapping=mapping,
-        )
+        return AnonymizationResult(anonymized_text=result_text, mapping=mapping)
 
     def deanonymize(self, text: str, mapping: dict[str, str]) -> str:
         """Replace placeholders in an LLM response with the original values."""
