@@ -4,6 +4,10 @@ Anonymization demo.
 Runs all data files in demo_data/ by default, or a specific one by name.
 Supports both .py sample files and .csv data files.
 
+CSV files can have an optional sidecar .json config (same stem) that controls
+which columns are anonymized and which entity types to detect per column —
+enabling selective anonymization without modifying the CSV itself.
+
 Usage:
     uv run python demo.py                          # run all files
     uv run python demo.py financial                # run demo_data/financial.py
@@ -12,10 +16,11 @@ Usage:
 
 import csv
 import importlib
+import json
 import sys
 from pathlib import Path
 
-from src.privacy_wrapper.anonymizer import Anonymizer
+from src.privacy_wrapper.anonymizer import Anonymizer, AnonymizationResult
 
 DEMO_DATA_DIR = Path(__file__).parent / "demo_data"
 WIDTH = 72
@@ -46,28 +51,59 @@ def run_py(stem: str) -> None:
 
 def run_csv(stem: str) -> None:
     path = DEMO_DATA_DIR / f"{stem}.csv"
-    title = stem.replace("_", " ").title()
+
+    # Optional sidecar config — same filename, .json extension.
+    # Controls which fields are anonymized and which entity types to use per
+    # field, enabling selective anonymization without touching the CSV itself.
+    #
+    # Schema:
+    #   {
+    #     "title": "My Dataset",
+    #     "fields": {
+    #       "name":           { "entities": ["PERSON"] },
+    #       "email":          { "entities": ["EMAIL_ADDRESS"] },
+    #       "amount":         { "skip": true },
+    #       "description":    { "skip": true }
+    #     }
+    #   }
+    #
+    # Fields absent from "fields" → anonymized with the full default entity list.
+    # Fields with "skip": true    → passed through unchanged.
+    # Fields with "entities": [...] → only those entity types detected.
+    sidecar_path = path.with_suffix(".json")
+    sidecar: dict = json.loads(sidecar_path.read_text()) if sidecar_path.exists() else {}
+    field_config: dict[str, dict] = sidecar.get("fields", {})
+    title = sidecar.get("title") or stem.replace("_", " ").title()
 
     _print_header(f"{title}  [CSV]")
+    if field_config:
+        print(f"  Config: {sidecar_path.name}\n")
 
     with path.open(newline="") as fh:
         reader = csv.DictReader(fh)
         headers = reader.fieldnames or []
 
         for row in reader:
-            # Anonymize each cell independently so the CSV structure
-            # (column names, delimiters) is preserved.
-            # Keep per-field results separate — merging mappings would cause
-            # collisions when two cells produce the same placeholder name
-            # (e.g. both an account number and a routing number become
-            # <PHONE_NUMBER_0> when each cell is processed in isolation).
-            cell_results = {field: anon.anonymize(row[field]) for field in headers}
+            # Anonymize each cell independently to preserve CSV structure.
+            # Per-field results are kept separate — merging would cause
+            # placeholder collisions when two cells produce the same name
+            # (e.g. account_number and routing_number both → <PHONE_NUMBER_0>).
+            cell_results: dict[str, AnonymizationResult] = {}
+            for col in headers:
+                cfg = field_config.get(col, {})
+                if cfg.get("skip"):
+                    cell_results[col] = AnonymizationResult(anonymized_text=row[col])
+                else:
+                    cell_results[col] = anon.anonymize(
+                        row[col],
+                        entities=cfg.get("entities"),  # None → use all defaults
+                    )
 
-            anon_row  = {field: cell_results[field].anonymized_text for field in headers}
-            all_mappings = {field: cell_results[field].mapping for field in headers}
+            anon_row     = {col: cell_results[col].anonymized_text for col in headers}
+            all_mappings = {col: cell_results[col].mapping          for col in headers}
             flat_mapping = {k: v for m in all_mappings.values() for k, v in m.items()}
 
-            print(f"\nOriginal row:")
+            print(f"Original row:")
             _print_row(row, headers)
 
             print(f"\nAnonymized row:")
@@ -75,16 +111,16 @@ def run_csv(stem: str) -> None:
 
             if flat_mapping:
                 print(f"\nMapping:")
-                for field in headers:
-                    if all_mappings[field]:
-                        print(f"  {field:<18} {all_mappings[field]}")
+                for col in headers:
+                    if all_mappings[col]:
+                        print(f"  {col:<18} {all_mappings[col]}")
 
             # Restore each cell using only its own mapping
-            for field in headers:
-                restored = anon.deanonymize(anon_row[field], cell_results[field].mapping)
-                assert restored == row[field], (
-                    f"Roundtrip failed for field '{field}': "
-                    f"{row[field]!r} → {restored!r}"
+            for col in headers:
+                restored = anon.deanonymize(anon_row[col], cell_results[col].mapping)
+                assert restored == row[col], (
+                    f"Roundtrip failed for field '{col}': "
+                    f"{row[col]!r} → {restored!r}"
                 )
 
             print("-" * WIDTH)

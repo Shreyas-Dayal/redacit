@@ -1,0 +1,13 @@
+{
+  "title": "Financial Transactions (selective)",
+  "fields": {
+    "date":           { "skip": true },
+    "name":           { "entities": ["PERSON"] },
+    "email":          { "entities": ["EMAIL_ADDRESS"] },
+    "account_number": { "entities": ["PHONE_NUMBER"] },
+    "routing_number": { "entities": ["PHONE_NUMBER"] },
+    "amount":         { "skip": true },
+    "type":           { "skip": true },
+    "description":    { "skip": true }
+  }
+}

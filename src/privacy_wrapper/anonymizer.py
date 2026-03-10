@@ -65,11 +65,21 @@ class Anonymizer:
         self.language = language
         self._analyzer = AnalyzerEngine()
 
-    def anonymize(self, text: str) -> AnonymizationResult:
-        """Detect and replace PII in text. Returns anonymized text and a restore map."""
+    def anonymize(
+        self,
+        text: str,
+        entities: list[str] | None = None,
+    ) -> AnonymizationResult:
+        """
+        Detect and replace PII in text. Returns anonymized text and a restore map.
+
+        entities: override the instance-level entity list for this call only.
+                  Useful for selective anonymization (e.g. only PERSON + EMAIL).
+                  Defaults to the list passed at construction time.
+        """
         hits = self._analyzer.analyze(
             text=text,
-            entities=self.entities,
+            entities=entities if entities is not None else self.entities,
             language=self.language,
             score_threshold=self.score_threshold,
         )
