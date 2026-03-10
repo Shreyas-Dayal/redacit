@@ -102,6 +102,91 @@ SAMPLES = [
         "expected_clean": True,
     },
 
+    # -------------------------------------------------------------------------
+    # Financial & structured content
+    # -------------------------------------------------------------------------
+
+    # --- Wire transfer instruction ---
+    {
+        "id": "wire_transfer",
+        "input": (
+            "Please initiate a wire transfer of $128,450.00 to:\n"
+            "Beneficiary: Eleanor Voss\n"
+            "Bank: First National Bank\n"
+            "Account: 7823901645\n"
+            "Routing: 021000021\n"
+            "Reference: INV-2024-00892"
+        ),
+        "sensitive": ["Eleanor Voss", "7823901645", "021000021"],
+    },
+
+    # --- IBAN / international payment ---
+    {
+        "id": "iban_payment",
+        "input": (
+            "Transfer EUR 42,000 to IBAN GB29NWBK60161331926819 "
+            "held by Marcus Heller at Barclays London. "
+            "BIC: NWBKGB2L."
+        ),
+        "sensitive": ["GB29NWBK60161331926819", "Marcus Heller"],
+    },
+
+    # --- Loan application (key-value block) ---
+    {
+        "id": "loan_application",
+        "input": (
+            "Applicant Name : Christine Okoro\n"
+            "SSN            : 489-52-1736\n"
+            "Annual Income  : $97,500\n"
+            "Loan Amount    : $350,000\n"
+            "Property Addr  : 412 Elmwood Drive, Austin, TX 78701\n"
+            "Credit Score   : 748"
+        ),
+        "sensitive": ["Christine Okoro", "489-52-1736"],
+    },
+
+    # --- Invoice (tabular prose) ---
+    {
+        "id": "invoice",
+        "input": (
+            "INVOICE #INV-20240315\n"
+            "Bill To : Thomas Reyes, treyes@reycorp.com\n"
+            "Item    : Software licence (annual)   $12,000.00\n"
+            "Item    : Support retainer (Q1)       $3,500.00\n"
+            "Total   : $15,500.00\n"
+            "Due     : 2024-04-15\n"
+            "Card on file: 5555-5555-5555-4444"
+        ),
+        "sensitive": ["Thomas Reyes", "treyes@reycorp.com", "5555-5555-5555-4444"],
+    },
+
+    # --- Trading / brokerage note ---
+    {
+        "id": "brokerage_note",
+        "input": (
+            "Account holder: Patricia Lim (pat.lim@investco.com)\n"
+            "Account no.   : 98-34521-7\n"
+            "Trade date    : 2024-03-08\n"
+            "Order         : BUY 500 shares AAPL @ $171.20\n"
+            "Settlement    : T+2 via DTC participant 0352"
+        ),
+        "sensitive": ["Patricia Lim", "pat.lim@investco.com"],
+    },
+
+    # --- Tax record ---
+    {
+        "id": "tax_record",
+        "input": (
+            "Taxpayer: Gerald Hutchins\n"
+            "TIN     : 346-88-2201\n"
+            "Tax Year: 2023\n"
+            "W-2 Wages            : $134,200\n"
+            "Federal Tax Withheld : $28,600\n"
+            "Employer EIN         : 12-3456789"
+        ),
+        "sensitive": ["Gerald Hutchins", "346-88-2201"],
+    },
+
     # --- No PII — should pass through completely unchanged ---
     {
         "id": "no_pii_science",
