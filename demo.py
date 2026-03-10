@@ -96,7 +96,8 @@ def run_csv(stem: str) -> None:
                 else:
                     cell_results[col] = anon.anonymize(
                         row[col],
-                        entities=cfg.get("entities"),  # None → use all defaults
+                        entities=cfg.get("entities"),          # None → use all defaults
+                        score_threshold=cfg.get("score_threshold"),  # None → use instance default
                     )
 
             anon_row     = {col: cell_results[col].anonymized_text for col in headers}
