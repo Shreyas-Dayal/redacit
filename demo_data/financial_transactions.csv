@@ -1,0 +1,9 @@
+date,name,email,account_number,routing_number,amount,type,description
+2024-01-15,Sarah Connor,sarah.connor@cyberdyne.com,7823901645,021000021,128450.00,WIRE,Vendor payment Q1
+2024-01-22,Marcus Heller,m.heller@heller-invest.com,4920183756,026009593,42000.00,WIRE,Consulting retainer Jan
+2024-02-03,Christine Okoro,c.okoro@okorolaw.com,3847291056,021000089,5750.00,ACH,Monthly retainer Feb
+2024-02-14,Thomas Reyes,treyes@reycorp.com,6612093847,091000019,15500.00,ACH,INV-20240315 settlement
+2024-02-28,Patricia Lim,pat.lim@investco.com,9834521700,021000021,171.20,BUY,500x AAPL @ $171.20
+2024-03-05,Gerald Hutchins,g.hutchins@taxadvisors.com,2938471650,011000138,28600.00,TAX,Federal withholding Q1
+2024-03-12,Eleanor Voss,eleanor.voss@vosscapital.com,7823901645,021000021,350000.00,WIRE,Mortgage drawdown tranche 1
+2024-03-20,James Whitfield,j.whitfield@globalfinance.io,5519203847,026009593,3200.00,ACH,Expense reimbursement Mar
