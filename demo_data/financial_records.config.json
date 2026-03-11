@@ -1,0 +1,25 @@
+{
+  "title": "Financial Records (nested JSON)",
+  "fields": {
+    "transaction_id":              { "skip": true },
+    "timestamp":                   { "skip": true },
+    "type":                        { "skip": true },
+    "amount":                      { "skip": true },
+    "currency":                    { "skip": true },
+    "memo":                        { "skip": true },
+    "payer.name":                  { "entities": ["PERSON"] },
+    "payer.email":                 { "entities": ["EMAIL_ADDRESS"] },
+    "payer.account_number":        { "entities": ["US_BANK_ACCOUNT"], "score_threshold": 0.0 },
+    "payer.routing_number":        { "entities": ["US_ROUTING_NUMBER"], "score_threshold": 0.0 },
+    "beneficiary.name":            { "entities": ["PERSON"] },
+    "beneficiary.email":           { "entities": ["EMAIL_ADDRESS"] },
+    "beneficiary.account_number":  { "entities": ["US_BANK_ACCOUNT"], "score_threshold": 0.0 },
+    "beneficiary.routing_number":  { "entities": ["US_ROUTING_NUMBER"], "score_threshold": 0.0 },
+    "taxpayer.name":               { "entities": ["PERSON"] },
+    "taxpayer.ssn":                { "entities": ["US_SSN"] },
+    "taxpayer.ein":                { "entities": ["EIN"], "score_threshold": 0.0 },
+    "taxpayer.email":              { "entities": ["EMAIL_ADDRESS"] },
+    "api_credentials.key":         { "entities": ["API_KEY"] },
+    "api_credentials.environment": { "skip": true }
+  }
+}
