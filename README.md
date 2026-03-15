@@ -1,6 +1,6 @@
 # wrapper-llm
 
-A local privacy layer that anonymizes sensitive data before it reaches a cloud LLM, then restores the original values in the response. No data leaves your machine as-is.
+A local privacy layer that anonymizes sensitive data before it reaches a cloud LLM, then restores original values in the response. No data leaves your machine as-is. No Docker required.
 
 ---
 
@@ -17,14 +17,12 @@ Cloud LLM  (sees only anonymized text)
     ↓
 Deanonymizer  →  replaces placeholders in the response with original values
     ↓
-Your app  (receives the reply with real names/emails/etc. restored)
+Your app  (receives the reply with real names / emails / etc. restored)
 ```
-
-Everything runs locally. No Docker required.
 
 ---
 
-## Detected entity types (default)
+## Detected entity types
 
 | Entity | Example |
 |---|---|
@@ -41,6 +39,10 @@ Everything runs locally. No Docker required.
 | `URL` | acme.com |
 | `US_PASSPORT` | 938475610 |
 | `US_DRIVER_LICENSE` | — |
+| `US_BANK_ACCOUNT` | 7823901645 *(custom)* |
+| `US_ROUTING_NUMBER` | 021000021 *(custom)* |
+| `EIN` | 12-3456789 *(custom)* |
+| `API_KEY` | sk-xK92mLp… *(custom)* |
 
 ---
 
@@ -49,128 +51,276 @@ Everything runs locally. No Docker required.
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# Install dependencies
 uv sync
-
-# Download the spaCy language model (one-time)
-uv run python -m spacy download en_core_web_lg
 ```
 
-Copy `.env.example` to `.env` and add your API key if you want to test live LLM calls:
+The spaCy language model (`en_core_web_lg`) is declared as a pinned dependency and installed automatically — no separate download step needed.
+
+Copy `.env.example` to `.env` and add your API key for live LLM calls:
 
 ```bash
 cp .env.example .env
-# edit .env and set OPENAI_API_KEY=sk-...
+# set OPENAI_API_KEY=sk-...
 ```
 
 ---
 
 ## Usage
 
-### Core API (no API key needed)
+### 1. CLI — no code needed
 
-```python
-from src.privacy_wrapper.anonymizer import Anonymizer
+```bash
+wrapper-llm anonymize "Schedule a call with John Smith at john@acme.com"
 
-anon = Anonymizer()
-
-result = anon.anonymize("Send the report to Alice Jones at alice@corp.com")
-print(result.anonymized_text)
-# → Send the report to <PERSON_0> at <EMAIL_ADDRESS_0>
-print(result.mapping)
-# → {'<PERSON_0>': 'Alice Jones', '<EMAIL_ADDRESS_0>': 'alice@corp.com'}
-
-# Restore original values from an LLM response
-restored = anon.deanonymize(result.anonymized_text, result.mapping)
-# → Send the report to Alice Jones at alice@corp.com
+# Anonymized:
+# Schedule a call with <PERSON_0> at <EMAIL_ADDRESS_0>
+#
+# Mapping:
+#   <PERSON_0>                       John Smith
+#   <EMAIL_ADDRESS_0>                john@acme.com
 ```
 
-### With a live LLM (requires `OPENAI_API_KEY`)
+Filter entity types or tune the confidence threshold:
 
-```python
-from src.privacy_wrapper.client import PrivacyClient
-
-client = PrivacyClient()
-reply = client.chat("Summarise the contract for John Smith at john@acme.com")
-# Anonymized before sending, restored in the reply automatically
+```bash
+wrapper-llm anonymize "John Smith, card 4111-1111-1111-1111" --entity PERSON
+wrapper-llm anonymize "..." --threshold 0.6
 ```
 
-### Selective anonymization
+Analyse an audit log:
 
-Restrict which entity types are detected for a single call:
+```bash
+wrapper-llm stats privacy_audit.jsonl --top 5
+```
 
-```python
-# Only redact names and emails — ignore dates, locations, etc.
-result = anon.anonymize(text, entities=["PERSON", "EMAIL_ADDRESS"])
+Start the REST API server (requires the `server` extra):
+
+```bash
+uv add 'wrapper-llm[server]'
+wrapper-llm serve --host 0.0.0.0 --port 8000
 ```
 
 ---
 
-## Demo
+### 2. Drop-in OpenAI replacement
 
-Run all demo datasets:
-
-```bash
-uv run python demo.py
-```
-
-Run a specific dataset by name:
-
-```bash
-uv run python demo.py general_pii
-uv run python demo.py financial
-uv run python demo.py financial_transactions   # CSV with selective config
-```
-
-### Adding a new demo dataset
-
-**Plain text samples** — create a `.py` file in `demo_data/`:
+The fastest path if you already have OpenAI code — change **one line**:
 
 ```python
-# demo_data/my_dataset.py
-TITLE = "My Dataset"
+# Before
+from openai import OpenAI
+client = OpenAI()
 
-SAMPLES = [
-    "Text with sensitive data here.",
-    "Another sample with John Doe and john@example.com.",
-]
+# After
+from privacy_wrapper import PrivacyOpenAI
+client = PrivacyOpenAI()
+
+# Everything else stays identical
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Summarise Alice Jones's contract at alice@corp.com"}],
+)
+# Alice Jones and alice@corp.com are anonymized before the API call
+# and restored in response.choices[0].message.content automatically
 ```
 
-**CSV data** — drop a `.csv` file in `demo_data/`. Optionally add a `.json` sidecar with the same stem to control which columns and entity types are anonymized:
+Tools, `response_format`, streaming, embeddings, and all other SDK call patterns work unchanged.
+
+---
+
+### 3. Simple chat client
+
+```python
+from privacy_wrapper import PrivacyClient
+
+client = PrivacyClient()          # reads OPENAI_API_KEY from env
+reply  = client.chat("Draft a letter to John Smith at john@acme.com")
+# PII stripped before the call, restored in the reply
+```
+
+Stream the response:
+
+```python
+for chunk in client.stream("Summarise the following contract: ..."):
+    print(chunk, end="", flush=True)
+```
+
+---
+
+### 4. Low-level anonymizer (manage the LLM call yourself)
+
+```python
+from privacy_wrapper import anonymize, deanonymize
+
+result   = anonymize("SSN: 346-12-5678, card: 4111-1111-1111-1111")
+raw      = your_llm_call(result.anonymized_text)
+restored = deanonymize(raw, result.mapping)
+```
+
+Restrict which entity types are detected for a single call:
+
+```python
+result = anonymize(text, entities=["PERSON", "EMAIL_ADDRESS"])
+```
+
+---
+
+### 5. Multi-turn conversations
+
+`PrivacySession` accumulates the placeholder-to-original mapping across turns so PII introduced in one message stays resolvable in later responses:
+
+```python
+from privacy_wrapper import PrivacyClient, PrivacySession
+
+session = PrivacySession()
+client  = PrivacyClient(session=session)
+
+client.chat("My name is Alice Jones")       # <PERSON_0> → Alice Jones stored
+client.chat("What did I just tell you?")    # placeholder resolved from session
+session.clear()                             # start a new conversation
+```
+
+---
+
+### 6. REST API
+
+```bash
+# Anonymize
+curl -s -X POST http://localhost:8000/anonymize \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Email alice@corp.com by Friday"}' | jq
+# { "anonymized_text": "Email <EMAIL_ADDRESS_0> by Friday",
+#   "mapping": {"<EMAIL_ADDRESS_0>": "alice@corp.com"} }
+
+# Restore
+curl -s -X POST http://localhost:8000/deanonymize \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Email <EMAIL_ADDRESS_0> by Friday",
+       "mapping": {"<EMAIL_ADDRESS_0>": "alice@corp.com"}}' | jq
+# { "text": "Email alice@corp.com by Friday" }
+
+# Chat proxy (requires OPENAI_API_KEY on the server)
+curl -s -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Summarise the contract for John Smith"}' | jq
+```
+
+Full OpenAPI docs available at `http://localhost:8000/docs` when the server is running.
+
+---
+
+### 7. Structured data — CSV and JSON files
+
+```python
+from privacy_wrapper import CsvAnonymizer, JsonAnonymizer
+
+# CSV — one result per row
+for row in CsvAnonymizer().anonymize_file("customers.csv"):
+    print(row.anonymized)      # dict with PII replaced per column
+    print(row.flat_mapping)    # combined placeholder map for this row
+
+# JSON — one result per record
+for rec in JsonAnonymizer().anonymize_file("records.json"):
+    print(rec.anonymized)      # nested dict with PII replaced at leaf strings
+```
+
+Add a sidecar config file to control per-column or per-path rules:
 
 ```json
+// customers.json  (placed alongside customers.csv)
 {
-  "title": "My Transactions",
   "fields": {
-    "name":        { "entities": ["PERSON"] },
-    "email":       { "entities": ["EMAIL_ADDRESS"] },
-    "amount":      { "skip": true },
-    "date":        { "skip": true }
+    "name":    { "entities": ["PERSON"] },
+    "email":   { "entities": ["EMAIL_ADDRESS"] },
+    "amount":  { "skip": true },
+    "date":    { "skip": true }
   }
 }
 ```
 
 | Field option | Effect |
 |---|---|
-| `"entities": [...]` | Only those PII types detected for this column |
-| `"skip": true` | Column passed through unchanged |
-| *(no entry)* | Full default entity list applied |
+| `"entities": [...]` | Only those PII types detected for this field |
+| `"skip": true` | Field passed through unchanged |
+| `"score_threshold": N` | Per-field confidence threshold |
+| *(no entry)* | Full default entity list at default threshold |
 
-`demo.py` discovers all `.py` and `.csv` files in `demo_data/` automatically — no changes to `demo.py` needed.
+---
+
+### 8. Audit logging
+
+`AuditLogger` writes append-only JSONL. Raw text and mapping values are **never** stored — only metadata safe for compliance review:
+
+```python
+from privacy_wrapper import PrivacyClient, AuditLogger
+
+with AuditLogger("privacy_audit.jsonl") as log:
+    client = PrivacyClient(audit_logger=log)
+    client.chat("Wire $50,000 to account 7823901645")
+
+# Appended record:
+# {
+#   "ts": "2024-11-01T12:00:00+00:00",
+#   "input_hash": "a3f9b2c1...",          ← SHA-256[:16] of the input
+#   "entity_counts": {"US_BANK_ACCOUNT": 1},
+#   "total_redacted": 1,
+#   "provider": "openai",
+#   "model": "gpt-4o-mini"
+# }
+```
+
+Analyse a log file from the CLI:
+
+```bash
+wrapper-llm stats privacy_audit.jsonl
+
+# Audit log : privacy_audit.jsonl
+# Records   : 142
+# Total PII : 389
+#
+# Top 5 entity types:
+#   PERSON                         98
+#   EMAIL_ADDRESS                  71
+#   US_BANK_ACCOUNT                54
+#   CREDIT_CARD                    41
+#   PHONE_NUMBER                   38
+```
+
+---
+
+## Demo
+
+```bash
+uv run python demo.py                        # run all demo datasets
+uv run python demo.py general_pii            # plain text PII samples
+uv run python demo.py financial              # financial prose samples
+uv run python demo.py financial_transactions # CSV with per-column config
+uv run python demo.py financial_records      # nested JSON with sidecar
+```
+
+### Adding a demo dataset
+
+**Plain text** — add a `.py` file to `demo_data/`:
+
+```python
+# demo_data/my_dataset.py
+TITLE = "My Dataset"
+SAMPLES = [
+    "Text with sensitive data here.",
+    "Another sample with John Doe at john@example.com.",
+]
+```
+
+**CSV** — drop a `.csv` into `demo_data/` and optionally a `.json` sidecar with the same stem. `demo.py` auto-discovers both.
 
 ---
 
 ## Tests
 
 ```bash
-# Run all tests
-uv run pytest tests/ -v
-
-# Unit tests only (no external services needed)
-uv run pytest tests/unit/ -v
-
-# Data-driven sample tests
-uv run pytest tests/test_samples.py -v
+uv run pytest                        # full suite
+uv run pytest tests/unit/            # recognizer unit tests only
+uv run pytest tests/test_samples.py  # data-driven leakage and roundtrip tests
 ```
 
 ---
@@ -179,24 +329,45 @@ uv run pytest tests/test_samples.py -v
 
 ```
 wrapper-llm/
-├── src/
-│   └── privacy_wrapper/
-│       ├── anonymizer.py       # Core — Presidio-based PII detection and replacement
-│       └── client.py           # OpenAI wrapper with anonymize/deanonymize lifecycle
-├── demo_data/
-│   ├── general_pii.py          # General PII samples (names, emails, SSNs, cards)
-│   ├── financial.py            # Financial prose samples (invoices, wire transfers)
-│   ├── financial_transactions.csv   # Structured CSV transactions
-│   └── financial_transactions.json  # Per-column anonymization config for the CSV
+├── src/privacy_wrapper/
+│   ├── __init__.py             # public API — all exports live here
+│   ├── anonymizer.py           # core PII detection and placeholder replacement
+│   ├── _types.py               # FieldConfig, SidecarConfig, LLMClient protocol
+│   ├── session.py              # PrivacySession — multi-turn mapping accumulator
+│   ├── audit.py                # AuditLogger — append-only JSONL compliance log
+│   ├── cli.py                  # wrapper-llm CLI (anonymize / serve / stats)
+│   ├── server.py               # FastAPI server (optional — requires [server] extra)
+│   ├── client/
+│   │   ├── base.py             # BaseLLMClient — anonymize → call → deanonymize lifecycle
+│   │   ├── openai_client.py    # PrivacyClient + PrivacyOpenAI (drop-in proxy)
+│   │   └── litellm_client.py   # LiteLLMPrivacyClient (optional — requires [litellm] extra)
+│   ├── formats/
+│   │   ├── csv.py              # CsvAnonymizer — row-by-row CSV processing
+│   │   ├── json_format.py      # JsonAnonymizer — record-by-record JSON processing
+│   │   └── _helpers.py         # flatten / unflatten / load_sidecar / anonymize_flat
+│   └── recognizers/
+│       ├── bank_account.py     # UsBankAccountRecognizer
+│       ├── routing_number.py   # UsRoutingNumberRecognizer
+│       ├── ein.py              # EinRecognizer
+│       └── api_key.py          # ApiKeyRecognizer (sk-*, Bearer tokens, hex secrets)
+├── demo_data/                  # sample datasets for demo.py
 ├── tests/
-│   ├── fixtures/
-│   │   └── sample_prompts.py   # Shared test data with known sensitive values
-│   ├── test_anonymizer.py      # Unit tests for Anonymizer
-│   └── test_samples.py         # Data-driven leakage, roundtrip, and passthrough tests
-├── demo.py                     # Demo runner (supports .py and .csv datasets)
-├── pyproject.toml
-└── .env.example
+│   ├── fixtures/sample_prompts.py
+│   ├── test_anonymizer.py
+│   ├── test_samples.py
+│   ├── test_cli.py
+│   ├── test_server.py
+│   └── unit/test_recognizers.py
+├── demo.py
+└── pyproject.toml
 ```
+
+### Optional extras
+
+| Extra | Installs | Enables |
+|---|---|---|
+| `wrapper-llm[server]` | fastapi, uvicorn | `wrapper-llm serve`, REST API |
+| `wrapper-llm[litellm]` | litellm | `LiteLLMPrivacyClient` (Anthropic, Gemini, Ollama, …) |
 
 ---
 
@@ -205,14 +376,7 @@ wrapper-llm/
 | Limitation | Detail |
 |---|---|
 | Non-US phone numbers | UK/EU mobile numbers may fall below the default confidence threshold without a country-specific recognizer |
-| API keys / secrets | No built-in recognizer for patterns like `sk-*`, `pk-*` — planned as a custom recognizer |
-| Numeric pattern collisions | Bank account and routing numbers are matched as `PHONE_NUMBER`; EINs may match as `DATE_TIME`. Values are still redacted and restored correctly |
-| Credit card Luhn validation | Card numbers must pass checksum validation to be detected — synthetic/invalid numbers will not be caught |
-| LLM response paraphrasing | If the LLM rephrases a placeholder (e.g. expands `<PERSON_0>` to `Person Zero`), deanonymization will not restore it |
-
----
-
-## Research & planning
-
-- [`PRIVACY_LAYER_PLAN.md`](PRIVACY_LAYER_PLAN.md) — research notes covering five approaches to LLM data privacy (Presidio, proxy gateways, SLMs, FHE, local models)
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — full phased implementation plan including LiteLLM proxy integration and SLM layer
+| Numeric pattern collisions | Bank account and routing numbers can overlap with `PHONE_NUMBER` detections; overlap resolution keeps the higher-confidence span |
+| Credit card Luhn validation | Card numbers must pass checksum validation — synthetic or invalid numbers are not caught |
+| LLM response paraphrasing | If the LLM rewrites a placeholder (e.g. expands `<PERSON_0>` to `Person Zero`), deanonymization will not restore it |
+| Streaming deanonymization | The streaming client buffers the full response before deanonymizing, since placeholders may span token boundaries |
