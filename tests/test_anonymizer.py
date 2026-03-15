@@ -1,5 +1,5 @@
 import pytest
-from src.privacy_wrapper.anonymizer import Anonymizer, AnonymizationResult
+from privacy_wrapper.anonymizer import Anonymizer, AnonymizationResult
 
 
 @pytest.fixture(scope="module")

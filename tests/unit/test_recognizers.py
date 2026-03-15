@@ -8,7 +8,7 @@ pinpoint exactly which pattern or context word is responsible.
 import pytest
 from presidio_analyzer import AnalyzerEngine
 
-from src.privacy_wrapper.recognizers import (
+from privacy_wrapper.recognizers import (
     ApiKeyRecognizer,
     EinRecognizer,
     UsBankAccountRecognizer,
