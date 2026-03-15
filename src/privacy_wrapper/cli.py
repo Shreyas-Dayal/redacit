@@ -53,7 +53,25 @@ def serve(
     reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev)."),
 ) -> None:
     """Start the anonymization API server."""
-    raise NotImplementedError("serve command not yet implemented")
+    missing = [pkg for pkg in ("fastapi", "uvicorn") if _missing(pkg)]
+    if missing:
+        typer.echo(
+            f"{', '.join(missing)} is required to run the server.\n"
+            "Install with: uv add 'wrapper-llm[server]'",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    import uvicorn  # noqa: PLC0415 — guarded above
+
+    typer.echo(f"Starting wrapper-llm server on http://{host}:{port}")
+    uvicorn.run("privacy_wrapper.server:app", host=host, port=port, reload=reload)
+
+
+def _missing(pkg: str) -> bool:
+    """Return True if *pkg* cannot be imported."""
+    from importlib.util import find_spec
+    return find_spec(pkg) is None
 
 
 @app.command()
