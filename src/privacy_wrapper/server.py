@@ -15,10 +15,11 @@ Start with:
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 try:
-    from fastapi import FastAPI
+    from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
@@ -66,6 +67,16 @@ class DeanonymizeResponse(BaseModel):
     text: str
 
 
+class ChatRequest(BaseModel):
+    prompt: str
+    system: str | None = None
+    model: str = "gpt-4o-mini"
+
+
+class ChatResponse(BaseModel):
+    response: str
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -97,7 +108,22 @@ def deanonymize_endpoint(body: DeanonymizeRequest) -> DeanonymizeResponse:
     return DeanonymizeResponse(text=text)
 
 
-@app.post("/chat")
-async def chat(body: dict) -> dict:
-    """Proxy a chat completion request with automatic PII anonymization."""
-    return {"status": "not_implemented"}
+@app.post("/chat", response_model=ChatResponse)
+def chat_endpoint(body: ChatRequest) -> ChatResponse:
+    """
+    Proxy a chat completion through OpenAI with automatic PII anonymization.
+
+    Requires OPENAI_API_KEY to be set in the server environment.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="OPENAI_API_KEY is not configured on the server.",
+        )
+
+    from .client import PrivacyClient
+
+    client = PrivacyClient(api_key=api_key, model=body.model, anonymizer=_get_anonymizer())
+    response = client.chat(body.prompt, system=body.system)
+    return ChatResponse(response=response)
