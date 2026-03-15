@@ -28,6 +28,9 @@ wrapper-llm = "privacy_wrapper.cli:app"
 dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
+    "httpx>=0.27",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
 ]
 
 [tool.pytest.ini_options]
