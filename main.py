@@ -1,6 +1,4 @@
-def main():
-    print("Hello from wrapper-llm!")
-
+from privacy_wrapper.cli import app
 
 if __name__ == "__main__":
-    main()
+    app()
