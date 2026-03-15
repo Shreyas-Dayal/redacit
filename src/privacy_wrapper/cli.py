@@ -31,7 +31,19 @@ def anonymize(
     ),
 ) -> None:
     """Anonymize PII in TEXT and print the result."""
-    raise NotImplementedError("anonymize command not yet implemented")
+    from privacy_wrapper.anonymizer import Anonymizer
+
+    anon = Anonymizer()
+    result = anon.anonymize(text, entities=entities or None, score_threshold=threshold)
+
+    typer.echo(f"\nAnonymized:\n{result.anonymized_text}")
+
+    if result.mapping:
+        typer.echo("\nMapping:")
+        for placeholder, original in result.mapping.items():
+            typer.echo(f"  {placeholder:<32} {original}")
+    else:
+        typer.echo("\nNo PII detected.")
 
 
 @app.command()
