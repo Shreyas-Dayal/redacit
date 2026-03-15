@@ -534,6 +534,14 @@ wheels = [
 ]
 
 [[package]]
+name = "en-core-web-lg"
+version = "3.8.0"
+source = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }
+wheels = [
+    { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl", hash = "sha256:293e9547a655b25499198ab15a525b05b9407a75f10255e405e8c3854329ab63" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.135.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2725,6 +2733,7 @@ name = "wrapper-llm"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "en-core-web-lg" },
     { name = "openai" },
     { name = "presidio-analyzer" },
     { name = "presidio-anonymizer" },
@@ -2753,6 +2762,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "en-core-web-lg", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.111" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.40" },
     { name = "openai", specifier = ">=2.26.0" },
