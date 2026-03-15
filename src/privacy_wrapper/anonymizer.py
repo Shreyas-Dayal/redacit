@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.recognizer_result import RecognizerResult
 
+from .recognizers import build_custom_recognizers
+
 DEFAULT_ENTITIES = [
+    # Built-in Presidio entities
     "PERSON",
     "EMAIL_ADDRESS",
     "PHONE_NUMBER",
@@ -24,6 +27,11 @@ DEFAULT_ENTITIES = [
     "IBAN_CODE",
     "US_PASSPORT",
     "US_DRIVER_LICENSE",
+    # Custom entities
+    "US_BANK_ACCOUNT",
+    "US_ROUTING_NUMBER",
+    "EIN",
+    "API_KEY",
 ]
 
 
@@ -64,24 +72,29 @@ class Anonymizer:
         self.score_threshold = score_threshold
         self.language = language
         self._analyzer = AnalyzerEngine()
+        for recognizer in build_custom_recognizers():
+            self._analyzer.registry.add_recognizer(recognizer)
 
     def anonymize(
         self,
         text: str,
         entities: list[str] | None = None,
+        score_threshold: float | None = None,
     ) -> AnonymizationResult:
         """
         Detect and replace PII in text. Returns anonymized text and a restore map.
 
-        entities: override the instance-level entity list for this call only.
-                  Useful for selective anonymization (e.g. only PERSON + EMAIL).
-                  Defaults to the list passed at construction time.
+        entities:        override the instance-level entity list for this call only.
+        score_threshold: override the instance-level threshold for this call only.
+                         Useful when the caller already knows the field type (e.g.
+                         a CSV column explicitly declared as US_BANK_ACCOUNT) and
+                         wants to lower the bar without surrounding context words.
         """
         hits = self._analyzer.analyze(
             text=text,
             entities=entities if entities is not None else self.entities,
             language=self.language,
-            score_threshold=self.score_threshold,
+            score_threshold=score_threshold if score_threshold is not None else self.score_threshold,
         )
 
         if not hits:

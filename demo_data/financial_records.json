@@ -1,0 +1,60 @@
+[
+  {
+    "transaction_id": "TXN-2024-001",
+    "timestamp": "2024-01-15T09:23:00Z",
+    "type": "WIRE",
+    "amount": 128450.00,
+    "currency": "USD",
+    "memo": "Vendor payment Q1",
+    "payer": {
+      "name": "Sarah Connor",
+      "email": "sarah.connor@cyberdyne.com",
+      "account_number": "7823901645",
+      "routing_number": "021000021"
+    },
+    "beneficiary": {
+      "name": "Eleanor Voss",
+      "email": "eleanor.voss@vosscapital.com",
+      "account_number": "9283746510",
+      "routing_number": "026009593"
+    }
+  },
+  {
+    "transaction_id": "TXN-2024-002",
+    "timestamp": "2024-01-22T14:05:00Z",
+    "type": "ACH",
+    "amount": 5750.00,
+    "currency": "USD",
+    "memo": "Monthly retainer Feb",
+    "payer": {
+      "name": "Thomas Reyes",
+      "email": "treyes@reycorp.com",
+      "account_number": "6612093847",
+      "routing_number": "091000019"
+    },
+    "beneficiary": {
+      "name": "Christine Okoro",
+      "email": "c.okoro@okorolaw.com",
+      "account_number": "3847291056",
+      "routing_number": "021000089"
+    }
+  },
+  {
+    "transaction_id": "TXN-2024-003",
+    "timestamp": "2024-02-03T11:47:00Z",
+    "type": "TAX",
+    "amount": 28600.00,
+    "currency": "USD",
+    "memo": "Federal withholding Q1",
+    "taxpayer": {
+      "name": "Gerald Hutchins",
+      "ssn": "346-88-2201",
+      "ein": "12-3456789",
+      "email": "g.hutchins@taxadvisors.com"
+    },
+    "api_credentials": {
+      "key": "sk-xK92mLpQr7vNtYeZ3481abcdef",
+      "environment": "production"
+    }
+  }
+]

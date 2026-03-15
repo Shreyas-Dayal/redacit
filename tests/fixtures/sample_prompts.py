@@ -88,18 +88,42 @@ SAMPLES = [
         "sensitive": ["Robert Langdon", "938475610"],
     },
 
-    # --- Internal credentials / secrets ---
-    # Presidio has no built-in recognizer for API key patterns (sk-*, pk-*, etc.).
-    # This sample is kept to document the gap; detection requires a custom
-    # PatternRecognizer — planned for Phase 2.
+    # --- API key ---
     {
-        "id": "api_key_leak",
+        "id": "api_key_openai",
         "input": (
-            "Use the staging key sk-staging-xK92mLpQr7vNtYeZ3481 to authenticate. "
+            "Use the staging key sk-xK92mLpQr7vNtYeZ3481abcdef to authenticate. "
             "Do not share this outside the team."
         ),
-        "sensitive": [],  # known gap: no built-in API key recognizer
-        "expected_clean": True,
+        "sensitive": ["sk-xK92mLpQr7vNtYeZ3481abcdef"],
+    },
+
+    # --- Bearer token ---
+    {
+        "id": "api_key_bearer",
+        "input": "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+        "sensitive": ["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"],
+    },
+
+    # --- Bank account ---
+    {
+        "id": "bank_account",
+        "input": "Please deposit funds to account number 7823901645 at First National.",
+        "sensitive": ["7823901645"],
+    },
+
+    # --- Routing number ---
+    {
+        "id": "routing_number",
+        "input": "Wire transfer routing number: 021000021",
+        "sensitive": ["021000021"],
+    },
+
+    # --- EIN ---
+    {
+        "id": "ein",
+        "input": "Employer Identification Number: 12-3456789",
+        "sensitive": ["12-3456789"],
     },
 
     # -------------------------------------------------------------------------
@@ -117,6 +141,7 @@ SAMPLES = [
             "Routing: 021000021\n"
             "Reference: INV-2024-00892"
         ),
+        # Account detected as US_BANK_ACCOUNT, Routing as US_ROUTING_NUMBER
         "sensitive": ["Eleanor Voss", "7823901645", "021000021"],
     },
 
@@ -184,7 +209,8 @@ SAMPLES = [
             "Federal Tax Withheld : $28,600\n"
             "Employer EIN         : 12-3456789"
         ),
-        "sensitive": ["Gerald Hutchins", "346-88-2201"],
+        # TIN detected as US_SSN, EIN now detected by custom EinRecognizer
+        "sensitive": ["Gerald Hutchins", "346-88-2201", "12-3456789"],
     },
 
     # --- No PII — should pass through completely unchanged ---

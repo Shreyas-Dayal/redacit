@@ -4,8 +4,8 @@
     "date":           { "skip": true },
     "name":           { "entities": ["PERSON"] },
     "email":          { "entities": ["EMAIL_ADDRESS"] },
-    "account_number": { "entities": ["PHONE_NUMBER"] },
-    "routing_number": { "entities": ["PHONE_NUMBER"] },
+    "account_number": { "entities": ["US_BANK_ACCOUNT"], "score_threshold": 0.0 },
+    "routing_number": { "entities": ["US_ROUTING_NUMBER"], "score_threshold": 0.0 },
     "amount":         { "skip": true },
     "type":           { "skip": true },
     "description":    { "skip": true }
