@@ -128,12 +128,12 @@ Tools, `response_format`, streaming, embeddings, and all other SDK call patterns
 
 ---
 
-### 3. Simple chat client
+### 3. Simple chat client (OpenAI)
 
 ```python
-from privacy_wrapper import PrivacyClient
+from privacy_wrapper import OpenAIPrivacyClient
 
-client = PrivacyClient()          # reads OPENAI_API_KEY from env
+client = OpenAIPrivacyClient()    # reads OPENAI_API_KEY from env
 reply  = client.chat("Draft a letter to John Smith at john@acme.com")
 # PII stripped before the call, restored in the reply
 ```
@@ -143,6 +143,17 @@ Stream the response:
 ```python
 for chunk in client.stream("Summarise the following contract: ..."):
     print(chunk, end="", flush=True)
+```
+
+### 3b. Unified client — any SDK
+
+```python
+from privacy_wrapper import PrivacyClient
+from openai import OpenAI              # or anthropic.Anthropic, google.genai.Client
+
+client = PrivacyClient(OpenAI())
+reply  = client.query("Draft a letter to John Smith at john@acme.com")
+# Works identically with any supported SDK
 ```
 
 ---
@@ -170,10 +181,10 @@ result = anonymize(text, entities=["PERSON", "EMAIL_ADDRESS"])
 `PrivacySession` accumulates the placeholder-to-original mapping across turns so PII introduced in one message stays resolvable in later responses:
 
 ```python
-from privacy_wrapper import PrivacyClient, PrivacySession
+from privacy_wrapper import OpenAIPrivacyClient, PrivacySession
 
 session = PrivacySession()
-client  = PrivacyClient(session=session)
+client  = OpenAIPrivacyClient(session=session)
 
 client.chat("My name is Alice Jones")       # <PERSON_0> → Alice Jones stored
 client.chat("What did I just tell you?")    # placeholder resolved from session
@@ -252,10 +263,10 @@ Add a sidecar config file to control per-column or per-path rules:
 `AuditLogger` writes append-only JSONL. Raw text and mapping values are **never** stored — only metadata safe for compliance review:
 
 ```python
-from privacy_wrapper import PrivacyClient, AuditLogger
+from privacy_wrapper import OpenAIPrivacyClient, AuditLogger
 
 with AuditLogger("privacy_audit.jsonl") as log:
-    client = PrivacyClient(audit_logger=log)
+    client = OpenAIPrivacyClient(audit_logger=log)
     client.chat("Wire $50,000 to account 7823901645")
 
 # Appended record:
@@ -339,7 +350,8 @@ wrapper-llm/
 │   ├── server.py               # FastAPI server (optional — requires [server] extra)
 │   ├── client/
 │   │   ├── base.py             # BaseLLMClient — anonymize → call → deanonymize lifecycle
-│   │   ├── openai_client.py    # PrivacyClient + PrivacyOpenAI (drop-in proxy)
+│   │   ├── privacy_client.py   # PrivacyClient — unified drop-in proxy for any SDK
+│   │   ├── openai_client.py    # OpenAIPrivacyClient + PrivacyOpenAI
 │   │   └── litellm_client.py   # LiteLLMPrivacyClient (optional — requires [litellm] extra)
 │   ├── formats/
 │   │   ├── csv.py              # CsvAnonymizer — row-by-row CSV processing
