@@ -94,11 +94,11 @@ class BaseLLMClient(ABC):
                 model=self._model_name(),
             )
 
-        buffer = ""
+        chunks: list[str] = []
         for chunk in self._stream_raw(result.anonymized_text, system):
-            buffer += chunk
+            chunks.append(chunk)
 
-        yield self._anonymizer.deanonymize(buffer, mapping)
+        yield self._anonymizer.deanonymize("".join(chunks), mapping)
 
     # ------------------------------------------------------------------
     # Subclass interface
