@@ -6,11 +6,21 @@ Flow:
   → returns anonymized text + mapping for later restoration
 """
 
+from __future__ import annotations
+
+import logging
 from dataclasses import dataclass, field
+
+import spacy
 from presidio_analyzer import AnalyzerEngine
+from presidio_analyzer.nlp_engine import NlpEngineProvider, SpacyNlpEngine
 from presidio_analyzer.recognizer_result import RecognizerResult
 
 from .recognizers import build_custom_recognizers
+
+_log = logging.getLogger(__name__)
+
+_MODEL_CHAIN = ["en_core_web_lg", "en_core_web_sm"]
 
 DEFAULT_ENTITIES = [
     # Built-in Presidio entities
@@ -61,17 +71,107 @@ def _resolve_overlaps(hits: list[RecognizerResult]) -> list[RecognizerResult]:
     return kept
 
 
+class _LoadedSpacyNlpEngine(SpacyNlpEngine):
+    """SpacyNlpEngine that wraps an already-loaded spaCy Language object."""
+
+    def __init__(self, loaded_model: spacy.language.Language) -> None:
+        super().__init__()
+        self.nlp = {"en": loaded_model}
+
+
+def _build_nlp_engine(model: str | None, language: str) -> SpacyNlpEngine:
+    """Build the NLP engine based on the requested model.
+
+    ``"auto"`` (default) tries installed models in size order and falls
+    back to ``spacy.blank()`` if none are found — giving regex-only
+    detection with zero download overhead.
+
+    Named models are created via ``NlpEngineProvider`` so that Presidio's
+    default ``NerModelConfiguration`` (including ``labels_to_ignore``) is
+    preserved exactly as it would be with a bare ``AnalyzerEngine()``.
+    """
+    if model is None:
+        _log.info("NLP model disabled — using regex-only detection")
+        return _LoadedSpacyNlpEngine(spacy.blank(language))
+
+    if model == "auto":
+        for name in _MODEL_CHAIN:
+            if spacy.util.is_package(name):
+                _log.info("Using NLP model: %s", name)
+                return _provider_engine(name, language)
+        _log.warning(
+            "No spaCy NER model found — PERSON, LOCATION, and ORGANIZATION "
+            "detection is disabled. Install a model with: "
+            "pip install 'wrapper-llm[model-sm]'"
+        )
+        return _LoadedSpacyNlpEngine(spacy.blank(language))
+
+    # Explicit model name
+    _log.info("Using NLP model: %s", model)
+    return _provider_engine(model, language)
+
+
+def _provider_engine(model_name: str, language: str) -> SpacyNlpEngine:
+    """Create a SpacyNlpEngine via NlpEngineProvider with Presidio's defaults.
+
+    The ``ner_model_configuration`` is passed explicitly because
+    ``NlpEngineProvider`` with a dict config does not apply the same
+    defaults as the bare ``AnalyzerEngine()`` constructor (notably
+    ``labels_to_ignore``).
+    """
+    config = {
+        "nlp_engine_name": "spacy",
+        "models": [{"lang_code": language, "model_name": model_name}],
+        "ner_model_configuration": {
+            "model_to_presidio_entity_mapping": {
+                "PER": "PERSON",
+                "PERSON": "PERSON",
+                "NORP": "NRP",
+                "FAC": "LOCATION",
+                "LOC": "LOCATION",
+                "GPE": "LOCATION",
+                "LOCATION": "LOCATION",
+                "ORG": "ORGANIZATION",
+                "ORGANIZATION": "ORGANIZATION",
+                "DATE": "DATE_TIME",
+                "TIME": "DATE_TIME",
+            },
+            "low_confidence_score_multiplier": 0.4,
+            "low_score_entity_names": [],
+            "labels_to_ignore": [
+                "ORGANIZATION",
+                "CARDINAL",
+                "EVENT",
+                "LANGUAGE",
+                "LAW",
+                "MONEY",
+                "ORDINAL",
+                "PERCENT",
+                "PRODUCT",
+                "QUANTITY",
+                "WORK_OF_ART",
+            ],
+        },
+    }
+    return NlpEngineProvider(nlp_configuration=config).create_engine()
+
+
 class Anonymizer:
     def __init__(
         self,
         entities: list[str] = DEFAULT_ENTITIES,
         score_threshold: float = 0.4,
         language: str = "en",
+        model: str = "auto",
     ):
         self.entities = entities
         self.score_threshold = score_threshold
         self.language = language
-        self._analyzer = AnalyzerEngine()
+        nlp_engine = _build_nlp_engine(model, language)
+        self._analyzer = AnalyzerEngine(
+            nlp_engine=nlp_engine,
+            supported_languages=[language],
+        )
         for recognizer in build_custom_recognizers():
             self._analyzer.registry.add_recognizer(recognizer)
 
