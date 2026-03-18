@@ -24,6 +24,7 @@ import warnings
 from typing import TYPE_CHECKING, Any, Callable
 
 from ..anonymizer import Anonymizer
+from .._types import UnsupportedProviderError
 
 if TYPE_CHECKING:
     from ..audit import AuditLogger
@@ -514,7 +515,7 @@ def _detect_adapter(
     for prefix, cls in _SDK_PREFIXES.items():
         if module.startswith(prefix):
             return cls(client, anonymizer, session, audit_logger)
-    raise TypeError(
+    raise UnsupportedProviderError(
         f"Unsupported SDK client: {module}.{type(client).__name__}. "
         "Pass call_fn=... for unsupported SDKs, or use LiteLLMPrivacyClient."
     )

@@ -9,7 +9,14 @@ from .client import (
 )
 from .formats import CsvAnonymizer, CsvRowResult, JsonAnonymizer, JsonRecordResult
 from .session import PrivacySession
-from ._types import FieldConfig, LLMClient, SidecarConfig
+from ._types import (
+    FieldConfig,
+    LLMClient,
+    ModelNotFoundError,
+    PrivacyWrapperError,
+    SidecarConfig,
+    UnsupportedProviderError,
+)
 
 __all__ = [
     # Core
@@ -36,6 +43,10 @@ __all__ = [
     "FieldConfig",
     "SidecarConfig",
     "LLMClient",
+    # Exceptions
+    "PrivacyWrapperError",
+    "UnsupportedProviderError",
+    "ModelNotFoundError",
 ]
 
 _default_anonymizer: Anonymizer | None = None

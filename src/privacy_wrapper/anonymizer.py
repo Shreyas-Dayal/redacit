@@ -16,6 +16,7 @@ from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.nlp_engine import NlpEngineProvider, SpacyNlpEngine
 from presidio_analyzer.recognizer_result import RecognizerResult
 
+from ._types import ModelNotFoundError
 from .recognizers import build_custom_recognizers
 
 _log = logging.getLogger(__name__)
@@ -107,6 +108,11 @@ def _build_nlp_engine(model: str | None, language: str) -> SpacyNlpEngine:
         return _LoadedSpacyNlpEngine(spacy.blank(language))
 
     # Explicit model name
+    if not spacy.util.is_package(model):
+        raise ModelNotFoundError(
+            f"spaCy model {model!r} is not installed. "
+            f"Install with: python -m spacy download {model}"
+        )
     _log.info("Using NLP model: %s", model)
     return _provider_engine(model, language)
 

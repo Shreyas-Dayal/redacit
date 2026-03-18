@@ -11,6 +11,26 @@ from __future__ import annotations
 from typing import Iterator, Protocol, TypedDict, runtime_checkable
 
 
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+class PrivacyWrapperError(Exception):
+    """Base exception for all wrapper-llm errors."""
+
+
+class UnsupportedProviderError(PrivacyWrapperError):
+    """Raised when an SDK client type is not recognised by PrivacyClient."""
+
+
+class ModelNotFoundError(PrivacyWrapperError):
+    """Raised when an explicitly requested spaCy model is not installed."""
+
+
+# ---------------------------------------------------------------------------
+# TypedDicts
+# ---------------------------------------------------------------------------
+
 class FieldConfig(TypedDict, total=False):
     """Per-field anonymization rules used in CSV and JSON sidecar configs."""
 
