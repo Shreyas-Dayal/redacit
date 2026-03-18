@@ -11,6 +11,10 @@ Usage:
 
 from __future__ import annotations
 
+import json
+from collections import Counter
+from pathlib import Path
+
 import typer
 
 app = typer.Typer(
@@ -31,7 +35,19 @@ def anonymize(
     ),
 ) -> None:
     """Anonymize PII in TEXT and print the result."""
-    raise NotImplementedError("anonymize command not yet implemented")
+    from privacy_wrapper.anonymizer import Anonymizer
+
+    anon = Anonymizer()
+    result = anon.anonymize(text, entities=entities or None, score_threshold=threshold)
+
+    typer.echo(f"\nAnonymized:\n{result.anonymized_text}")
+
+    if result.mapping:
+        typer.echo("\nMapping:")
+        for placeholder, original in result.mapping.items():
+            typer.echo(f"  {placeholder:<32} {original}")
+    else:
+        typer.echo("\nNo PII detected.")
 
 
 @app.command()
@@ -41,7 +57,25 @@ def serve(
     reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev)."),
 ) -> None:
     """Start the anonymization API server."""
-    raise NotImplementedError("serve command not yet implemented")
+    missing = [pkg for pkg in ("fastapi", "uvicorn") if _missing(pkg)]
+    if missing:
+        typer.echo(
+            f"{', '.join(missing)} is required to run the server.\n"
+            "Install with: uv add 'wrapper-llm[server]'",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    import uvicorn  # noqa: PLC0415 — guarded above
+
+    typer.echo(f"Starting wrapper-llm server on http://{host}:{port}")
+    uvicorn.run("privacy_wrapper.server:app", host=host, port=port, reload=reload)
+
+
+def _missing(pkg: str) -> bool:
+    """Return True if *pkg* cannot be imported."""
+    from importlib.util import find_spec
+    return find_spec(pkg) is None
 
 
 @app.command()
@@ -50,4 +84,37 @@ def stats(
     top: int = typer.Option(10, "--top", "-n", help="Show top N entity types."),
 ) -> None:
     """Print aggregated statistics from an audit log."""
-    raise NotImplementedError("stats command not yet implemented")
+    path = Path(audit_log)
+    if not path.exists():
+        typer.echo(f"File not found: {audit_log}", err=True)
+        raise typer.Exit(1)
+
+    counts: Counter[str] = Counter()
+    total_records = 0
+    total_redacted = 0
+
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            total_records += 1
+            total_redacted += record.get("total_redacted", 0)
+            for entity, count in record.get("entity_counts", {}).items():
+                counts[entity] += count
+
+    typer.echo(f"\nAudit log : {audit_log}")
+    typer.echo(f"Records   : {total_records}")
+    typer.echo(f"Total PII : {total_redacted}")
+
+    if counts:
+        shown = min(top, len(counts))
+        typer.echo(f"\nTop {shown} entity type{'s' if shown != 1 else ''}:")
+        for entity, count in counts.most_common(top):
+            typer.echo(f"  {entity:<30} {count}")
+    else:
+        typer.echo("\nNo PII events found.")
