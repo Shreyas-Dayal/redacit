@@ -233,6 +233,12 @@ class Anonymizer:
 
         return AnonymizationResult(anonymized_text=result_text, mapping=mapping)
 
+    def __repr__(self) -> str:
+        return (
+            f"Anonymizer(entities={len(self.entities)}, "
+            f"score_threshold={self.score_threshold})"
+        )
+
     def deanonymize(self, text: str, mapping: dict[str, str]) -> str:
         """Replace placeholders in an LLM response with the original values."""
         for placeholder, original in mapping.items():

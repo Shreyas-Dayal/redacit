@@ -88,6 +88,10 @@ class AuditLogger:
     # Context manager
     # ------------------------------------------------------------------
 
+    def __repr__(self) -> str:
+        target = getattr(self._fh, "name", repr(self._fh))
+        return f"AuditLogger({target})"
+
     def __enter__(self) -> AuditLogger:
         return self
 
