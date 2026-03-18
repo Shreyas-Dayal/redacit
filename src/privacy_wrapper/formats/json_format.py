@@ -25,7 +25,7 @@ from typing import Any, Iterator
 
 from .._types import FieldConfig, SidecarConfig
 from ..anonymizer import Anonymizer
-from ._helpers import anonymize_flat, flatten, load_sidecar, unflatten
+from ._helpers import anonymize_flat, deduplicate_placeholders, flatten, load_sidecar, unflatten
 
 
 @dataclass
@@ -71,6 +71,7 @@ class JsonAnonymizer:
         for idx, record in enumerate(records):
             flat_orig = flatten(record)
             cell_results = anonymize_flat(flat_orig, list(flat_orig.keys()), cfg, self._anon)
+            cell_results = deduplicate_placeholders(cell_results)
 
             # Preserve original non-string types (numbers, booleans, nulls).
             anon_flat: dict[str, Any] = {
