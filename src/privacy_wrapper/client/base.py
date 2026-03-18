@@ -79,7 +79,12 @@ class BaseLLMClient(ABC):
         tokens as they arrive is planned for a future sprint.
         """
         result = self._anonymizer.anonymize(prompt)
-        mapping = self._session.mapping if self._session else result.mapping
+
+        if self._session is not None:
+            self._session.update(result.mapping)
+            mapping = self._session.mapping
+        else:
+            mapping = result.mapping
 
         if self._audit is not None:
             self._audit.log(
