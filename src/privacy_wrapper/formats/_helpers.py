@@ -115,6 +115,11 @@ def anonymize_flat(
     """
     Anonymize a flat key→value dict using per-key FieldConfig rules.
 
+    Each string field is anonymized independently via ``anonymizer.anonymize()``.
+    For a CSV with *R* rows and *C* columns, this means *R × C* Presidio calls.
+    Performance scales linearly with data volume; there is no result caching
+    for identical field values.
+
     - Non-string values pass through wrapped in an empty AnonymizationResult.
     - Keys with skip=True pass through unchanged.
     - Keys absent from field_config use Anonymizer instance defaults.
