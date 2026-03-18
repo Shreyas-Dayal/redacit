@@ -8,9 +8,7 @@ clients, and the public API all depend on.
 
 from __future__ import annotations
 
-from typing import Iterator, Protocol, runtime_checkable
-
-from typing_extensions import TypedDict
+from typing import Iterator, Protocol, TypedDict, runtime_checkable
 
 
 class FieldConfig(TypedDict, total=False):

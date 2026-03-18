@@ -118,6 +118,9 @@ class _PrivacyCompletions:
         self._completions = completions
         self._anon = anonymizer
 
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._completions, name)
+
     def create(self, *, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
         merged_mapping: dict[str, str] = {}
         safe_messages: list[dict[str, Any]] = []
@@ -146,7 +149,11 @@ class _PrivacyCompletions:
 
 class _PrivacyChat:
     def __init__(self, chat: Any, anonymizer: Anonymizer) -> None:
+        self._chat = chat
         self.completions = _PrivacyCompletions(chat.completions, anonymizer)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._chat, name)
 
 
 class PrivacyOpenAI:
