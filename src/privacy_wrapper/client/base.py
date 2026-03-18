@@ -41,6 +41,36 @@ class BaseLLMClient(ABC):
         self._audit = audit_logger
 
     # ------------------------------------------------------------------
+    # Pipeline helpers (shared by chat and stream)
+    # ------------------------------------------------------------------
+
+    def _anonymize_prompt(
+        self, prompt: str,
+    ) -> tuple[str, dict[str, str], dict[str, str]]:
+        """Anonymize *prompt*, update session, return (anon_text, call_mapping, resolve_mapping).
+
+        ``call_mapping`` is the mapping from this call only (for audit).
+        ``resolve_mapping`` is the mapping to use for deanonymization —
+        the full session mapping if a session is active, otherwise the
+        call mapping.
+        """
+        result = self._anonymizer.anonymize(prompt)
+        if self._session is not None:
+            self._session.update(result.mapping)
+            return result.anonymized_text, result.mapping, self._session.mapping
+        return result.anonymized_text, result.mapping, result.mapping
+
+    def _audit_prompt(self, prompt: str, call_mapping: dict[str, str]) -> None:
+        """Log an audit record if an AuditLogger is configured."""
+        if self._audit is not None:
+            self._audit.log(
+                prompt,
+                call_mapping,
+                provider=self._provider_name(),
+                model=self._model_name(),
+            )
+
+    # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 
@@ -51,23 +81,9 @@ class BaseLLMClient(ABC):
         When a PrivacySession is active the mapping is merged into it so
         placeholders remain resolvable across turns.
         """
-        result = self._anonymizer.anonymize(prompt)
-
-        if self._session is not None:
-            self._session.update(result.mapping)
-            mapping = self._session.mapping
-        else:
-            mapping = result.mapping
-
-        if self._audit is not None:
-            self._audit.log(
-                prompt,
-                result.mapping,
-                provider=self._provider_name(),
-                model=self._model_name(),
-            )
-
-        raw = self._call(result.anonymized_text, system)
+        anon_text, call_mapping, mapping = self._anonymize_prompt(prompt)
+        self._audit_prompt(prompt, call_mapping)
+        raw = self._call(anon_text, system)
         return self._anonymizer.deanonymize(raw, mapping)
 
     def stream(self, prompt: str, system: str | None = None) -> Iterator[str]:
@@ -78,24 +94,11 @@ class BaseLLMClient(ABC):
         may span token boundaries. A sliding-window optimisation that flushes
         tokens as they arrive is planned for a future sprint.
         """
-        result = self._anonymizer.anonymize(prompt)
-
-        if self._session is not None:
-            self._session.update(result.mapping)
-            mapping = self._session.mapping
-        else:
-            mapping = result.mapping
-
-        if self._audit is not None:
-            self._audit.log(
-                prompt,
-                result.mapping,
-                provider=self._provider_name(),
-                model=self._model_name(),
-            )
+        anon_text, call_mapping, mapping = self._anonymize_prompt(prompt)
+        self._audit_prompt(prompt, call_mapping)
 
         chunks: list[str] = []
-        for chunk in self._stream_raw(result.anonymized_text, system):
+        for chunk in self._stream_raw(anon_text, system):
             chunks.append(chunk)
 
         yield self._anonymizer.deanonymize("".join(chunks), mapping)
