@@ -51,16 +51,40 @@ Your app  (receives the reply with real names / emails / etc. restored)
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync
+pip install wrapper-llm                  # base install — regex-only PII detection
+pip install "wrapper-llm[model-sm]"      # + person names, locations (11 MB model)
+pip install "wrapper-llm[model-lg]"      # + marginally better NER accuracy (560 MB)
 ```
-
-The spaCy language model (`en_core_web_lg`) is declared as a pinned dependency and installed automatically — no separate download step needed.
 
 Copy `.env.example` to `.env` and add your API key for live LLM calls:
 
 ```bash
 cp .env.example .env
 # set OPENAI_API_KEY=sk-...
+```
+
+---
+
+## Model options
+
+wrapper-llm auto-detects the best available spaCy model at startup. No configuration needed — it just uses whatever is installed.
+
+| Install command | Model | Size | Detects |
+|---|---|---|---|
+| `pip install wrapper-llm` | none (regex-only) | 0 MB | emails, SSNs, credit cards, phones, IBANs, API keys, bank accounts, EINs, URLs, IPs |
+| `pip install "wrapper-llm[model-sm]"` | en_core_web_sm | 11 MB | + person names, locations, organizations |
+| `pip install "wrapper-llm[model-lg]"` | en_core_web_lg | 560 MB | + marginally better NER accuracy (~0.8%) |
+
+For most use cases, `model-sm` is the best balance. Use the base install for structured-PII-only use cases (financial data, API key scrubbing) where you want minimal container size.
+
+You can also select the model explicitly in code:
+
+```python
+from privacy_wrapper import Anonymizer
+
+anon = Anonymizer()                          # auto-detect best available
+anon = Anonymizer(model="en_core_web_sm")    # explicit small model
+anon = Anonymizer(model=None)                # regex-only, no NLP model
 ```
 
 ---
