@@ -1,6 +1,12 @@
 from .anonymizer import Anonymizer, AnonymizationResult
 from .audit import AuditLogger
-from .client import BaseLLMClient, LiteLLMPrivacyClient, PrivacyClient, PrivacyOpenAI
+from .client import (
+    BaseLLMClient,
+    LiteLLMPrivacyClient,
+    OpenAIPrivacyClient,
+    PrivacyClient,
+    PrivacyOpenAI,
+)
 from .formats import CsvAnonymizer, CsvRowResult, JsonAnonymizer, JsonRecordResult
 from .session import PrivacySession
 from ._types import FieldConfig, LLMClient, SidecarConfig
@@ -15,6 +21,7 @@ __all__ = [
     # Clients
     "BaseLLMClient",
     "PrivacyClient",
+    "OpenAIPrivacyClient",
     "PrivacyOpenAI",
     "LiteLLMPrivacyClient",
     # Session & audit
