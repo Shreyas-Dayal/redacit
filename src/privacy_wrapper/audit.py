@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import IO
@@ -34,7 +35,8 @@ class AuditLogger:
     Append-only JSONL audit log.
 
     Accepts a file path (opened in append mode) or any writable text stream.
-    Thread-safe for single-process use (each write is a single flush call).
+    Thread-safe: writes are serialised by an internal lock so concurrent
+    callers (e.g. ASGI worker threads) never interleave records.
     """
 
     def __init__(self, path: str | Path | IO[str]) -> None:
@@ -44,6 +46,7 @@ class AuditLogger:
         else:
             self._fh = path
             self._owns_fh = False
+        self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -71,8 +74,10 @@ class AuditLogger:
             "provider": provider,
             "model": model,
         }
-        self._fh.write(json.dumps(record) + "\n")
-        self._fh.flush()
+        line = json.dumps(record) + "\n"
+        with self._lock:
+            self._fh.write(line)
+            self._fh.flush()
 
     def close(self) -> None:
         """Close the file handle (only if opened by this instance)."""

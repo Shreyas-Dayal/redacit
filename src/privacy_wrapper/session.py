@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 
 
@@ -28,18 +29,24 @@ class PrivacySession:
 
     Existing entries are never overwritten — if the same placeholder appears
     in two consecutive calls the first value is preserved, ensuring consistency.
+
+    Thread-safe: all mutations are protected by an internal lock so a single
+    session can safely be shared across concurrent requests.
     """
 
     mapping: dict[str, str] = field(default_factory=dict)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def update(self, new_mapping: dict[str, str]) -> None:
         """Merge new_mapping into the session; existing keys are not changed."""
-        for placeholder, original in new_mapping.items():
-            self.mapping.setdefault(placeholder, original)
+        with self._lock:
+            for placeholder, original in new_mapping.items():
+                self.mapping.setdefault(placeholder, original)
 
     def clear(self) -> None:
         """Reset the session mapping (call between independent conversations)."""
-        self.mapping.clear()
+        with self._lock:
+            self.mapping.clear()
 
     def __len__(self) -> int:
         return len(self.mapping)
