@@ -253,7 +253,7 @@ class _AnthropicMessagesProxy:
                     try:
                         block.text = self._adapter._deanonymize(block.text, mapping)
                     except (AttributeError, TypeError):
-                        pass  # frozen model — best-effort
+                        _log.debug("Could not mutate response field for deanonymization (frozen model?)")
 
         return response
 
@@ -360,7 +360,7 @@ class _GeminiModelsProxy:
                                 try:
                                     part.text = anon_text
                                 except (AttributeError, TypeError):
-                                    pass
+                                    _log.debug("Could not mutate Content part for anonymization (frozen model?)")
                     anon.append(item)
                 else:
                     anon.append(item)
@@ -373,7 +373,7 @@ class _GeminiModelsProxy:
                     try:
                         part.text = anon_text
                     except (AttributeError, TypeError):
-                        pass
+                        _log.debug("Could not mutate Content part for anonymization (frozen model?)")
                     return contents, m
         return contents, {}
 
@@ -387,7 +387,7 @@ class _GeminiModelsProxy:
             try:
                 config.system_instruction = anon_si
             except (AttributeError, TypeError):
-                pass
+                _log.debug("Could not mutate config.system_instruction (frozen model?)")
             return m
         return {}
 
@@ -414,7 +414,7 @@ class _GeminiModelsProxy:
                             try:
                                 part.text = self._adapter._deanonymize(part.text, mapping)
                             except (AttributeError, TypeError):
-                                pass
+                                _log.debug("Could not mutate response field for deanonymization (frozen model?)")
         return response
 
     def generate_content_stream(self, *, model: str, contents: Any, **kwargs: Any) -> Any:
