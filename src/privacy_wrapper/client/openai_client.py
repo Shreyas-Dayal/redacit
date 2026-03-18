@@ -1,11 +1,11 @@
 """
 OpenAI-specific privacy-aware clients.
 
-PrivacyClient
-    Replaces the original client.py. Identical public surface — existing code
-    calling PrivacyClient.chat() continues to work unchanged. Now inherits
-    BaseLLMClient so session, audit, and the anonymize/deanonymize lifecycle
-    are handled by the base class.
+OpenAIPrivacyClient
+    Simplified privacy-aware OpenAI chat client. Inherits BaseLLMClient for
+    the ``.chat(prompt)`` / ``.stream(prompt)`` API. Use this if you want the
+    simplified interface; use ``PrivacyClient(OpenAI())`` if you want a
+    drop-in proxy that preserves all SDK call patterns.
 
 PrivacyOpenAI
     Drop-in replacement for openai.OpenAI. Change ONE line in existing code:
@@ -38,10 +38,10 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# PrivacyClient — direct API wrapper (replaces client.py)
+# OpenAIPrivacyClient — direct API wrapper (replaces client.py)
 # ---------------------------------------------------------------------------
 
-class PrivacyClient(BaseLLMClient):
+class OpenAIPrivacyClient(BaseLLMClient):
     """
     Privacy-aware OpenAI chat client.
 
@@ -118,6 +118,9 @@ class _PrivacyCompletions:
         self._completions = completions
         self._anon = anonymizer
 
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._completions, name)
+
     def create(self, *, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
         merged_mapping: dict[str, str] = {}
         safe_messages: list[dict[str, Any]] = []
@@ -146,7 +149,11 @@ class _PrivacyCompletions:
 
 class _PrivacyChat:
     def __init__(self, chat: Any, anonymizer: Anonymizer) -> None:
+        self._chat = chat
         self.completions = _PrivacyCompletions(chat.completions, anonymizer)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._chat, name)
 
 
 class PrivacyOpenAI:

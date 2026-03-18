@@ -122,8 +122,8 @@ def chat_endpoint(body: ChatRequest) -> ChatResponse:
             detail="OPENAI_API_KEY is not configured on the server.",
         )
 
-    from .client import PrivacyClient
+    from .client import OpenAIPrivacyClient
 
-    client = PrivacyClient(api_key=api_key, model=body.model, anonymizer=_get_anonymizer())
+    client = OpenAIPrivacyClient(api_key=api_key, model=body.model, anonymizer=_get_anonymizer())
     response = client.chat(body.prompt, system=body.system)
     return ChatResponse(response=response)

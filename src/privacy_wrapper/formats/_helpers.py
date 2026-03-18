@@ -71,6 +71,41 @@ def unflatten(flat: dict[str, Any]) -> dict[str, Any]:
 # Per-field anonymization
 # ---------------------------------------------------------------------------
 
+def deduplicate_placeholders(
+    cell_results: dict[str, AnonymizationResult],
+) -> dict[str, AnonymizationResult]:
+    """
+    Rename placeholders so they are globally unique across all fields.
+
+    When each field is anonymized independently, two fields may both produce
+    ``<PERSON_0>`` for different original values.  This helper reassigns
+    indices with a single running counter so that no two fields share the
+    same placeholder key.
+    """
+    counters: dict[str, int] = {}  # entity_type → next index
+
+    for path in cell_results:
+        result = cell_results[path]
+        if not result.mapping:
+            continue
+        new_mapping: dict[str, str] = {}
+        new_text = result.anonymized_text
+        for old_ph, original in result.mapping.items():
+            # <ENTITY_TYPE_N> → ENTITY_TYPE
+            entity = old_ph.strip("<>").rsplit("_", 1)[0]
+            idx = counters.get(entity, 0)
+            counters[entity] = idx + 1
+            new_ph = f"<{entity}_{idx}>"
+            if new_ph != old_ph:
+                new_text = new_text.replace(old_ph, new_ph)
+            new_mapping[new_ph] = original
+        cell_results[path] = AnonymizationResult(
+            anonymized_text=new_text, mapping=new_mapping,
+        )
+
+    return cell_results
+
+
 def anonymize_flat(
     row: dict[str, Any],
     keys: list[str],
