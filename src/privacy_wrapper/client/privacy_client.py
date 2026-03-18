@@ -117,9 +117,17 @@ class _OpenAICompletionsProxy:
         if user_texts:
             self._adapter._log("\n".join(user_texts), merged, model)
 
+        is_stream = kwargs.get("stream", False)
+        if is_stream:
+            _log.warning(
+                "OpenAI proxy streaming: input is anonymized but response "
+                "chunks will contain placeholders. Use .query() for full "
+                "deanonymization, or use OpenAIPrivacyClient.stream()."
+            )
+
         response = self._completions.create(messages=safe, **kwargs)
 
-        if hasattr(response, "choices"):
+        if not is_stream and hasattr(response, "choices"):
             for choice in response.choices:
                 if hasattr(choice, "message") and choice.message.content:
                     choice.message.content = self._adapter._deanonymize(
@@ -278,8 +286,11 @@ class _AnthropicMessagesProxy:
 
         mapping = self._adapter._mapping(merged)
 
-        # Delegate to the real stream — return unwrapped for now
-        # (streaming deanonymization requires buffering, deferred to v2)
+        _log.warning(
+            "Anthropic proxy streaming: input is anonymized but response "
+            "text will contain placeholders. Use .query() for full "
+            "deanonymization, or use LiteLLMPrivacyClient.stream()."
+        )
         return self._messages.stream(messages=safe, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
@@ -413,7 +424,11 @@ class _GeminiModelsProxy:
         merged.update(self._anonymize_config(config))
         anon_contents, m = self._anonymize_contents(contents)
         merged.update(m)
-        # Return the raw stream — deanonymization of streamed chunks deferred to v2
+        _log.warning(
+            "Gemini proxy streaming: input is anonymized but response "
+            "text will contain placeholders. Use .query() for full "
+            "deanonymization, or use LiteLLMPrivacyClient.stream()."
+        )
         return self._models.generate_content_stream(model=model, contents=anon_contents, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
