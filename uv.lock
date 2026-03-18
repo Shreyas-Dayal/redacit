@@ -542,6 +542,14 @@ wheels = [
 ]
 
 [[package]]
+name = "en-core-web-sm"
+version = "3.8.0"
+source = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+wheels = [
+    { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl", hash = "sha256:1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.135.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2733,7 +2741,6 @@ name = "wrapper-llm"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "en-core-web-lg" },
     { name = "openai" },
     { name = "presidio-analyzer" },
     { name = "presidio-anonymizer" },
@@ -2749,6 +2756,12 @@ dev = [
 litellm = [
     { name = "litellm" },
 ]
+model-lg = [
+    { name = "en-core-web-lg" },
+]
+model-sm = [
+    { name = "en-core-web-sm" },
+]
 server = [
     { name = "fastapi" },
     { name = "uvicorn", extra = ["standard"] },
@@ -2756,6 +2769,7 @@ server = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "en-core-web-lg" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "pytest" },
@@ -2765,7 +2779,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "en-core-web-lg", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
+    { name = "en-core-web-lg", marker = "extra == 'model-lg'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
+    { name = "en-core-web-sm", marker = "extra == 'model-sm'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.111" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.40" },
     { name = "openai", specifier = ">=2.26.0" },
@@ -2777,10 +2792,11 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.29" },
 ]
-provides-extras = ["server", "litellm", "dev"]
+provides-extras = ["model-sm", "model-lg", "server", "litellm", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "en-core-web-lg", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = ">=0.111" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "pytest", specifier = ">=9.0.2" },
