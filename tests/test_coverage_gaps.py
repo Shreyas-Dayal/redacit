@@ -112,10 +112,31 @@ class TestSessionLifecycle:
         session.update({"<EMAIL_0>": "alice@corp.com"})
         assert len(session) == 2
 
+    def test_max_size_evicts_oldest(self):
+        session = PrivacySession(max_size=2)
+        session.update({"<PERSON_0>": "Alice"})
+        session.update({"<EMAIL_0>": "alice@corp.com"})
+        session.update({"<PHONE_0>": "555-1234"})
+        assert len(session) == 2
+        # Oldest entry (PERSON_0) should be evicted
+        assert "<PERSON_0>" not in session.mapping
+        assert "<EMAIL_0>" in session.mapping
+        assert "<PHONE_0>" in session.mapping
+
+    def test_max_size_none_is_unlimited(self):
+        session = PrivacySession(max_size=None)
+        for i in range(100):
+            session.update({f"<PERSON_{i}>": f"Person {i}"})
+        assert len(session) == 100
+
     def test_repr(self):
         session = PrivacySession()
         session.update({"<PERSON_0>": "Alice"})
         assert "1 entries" in repr(session)
+
+    def test_repr_with_max_size(self):
+        session = PrivacySession(max_size=50)
+        assert "max_size=50" in repr(session)
 
 
 # ---------------------------------------------------------------------------

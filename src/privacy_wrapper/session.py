@@ -18,8 +18,12 @@ Usage:
 
 from __future__ import annotations
 
+import logging
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,16 +36,31 @@ class PrivacySession:
 
     Thread-safe: all mutations are protected by an internal lock so a single
     session can safely be shared across concurrent requests.
+
+    Args:
+        max_size: Maximum number of placeholder entries to keep. When exceeded,
+                  the oldest entries are evicted (LRU). ``None`` (default) means
+                  no limit.
     """
 
-    mapping: dict[str, str] = field(default_factory=dict)
+    mapping: dict[str, str] = field(default_factory=OrderedDict)
+    max_size: int | None = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def update(self, new_mapping: dict[str, str]) -> None:
         """Merge new_mapping into the session; existing keys are not changed."""
         with self._lock:
             for placeholder, original in new_mapping.items():
-                self.mapping.setdefault(placeholder, original)
+                if placeholder not in self.mapping:
+                    self.mapping[placeholder] = original
+                else:
+                    # Move existing key to end (most recently used)
+                    self.mapping.move_to_end(placeholder)  # type: ignore[union-attr]
+
+            if self.max_size is not None:
+                while len(self.mapping) > self.max_size:
+                    evicted_key, _ = self.mapping.popitem(last=False)  # type: ignore[call-arg]
+                    _log.debug("Session evicted oldest entry: %s", evicted_key)
 
     def clear(self) -> None:
         """Reset the session mapping (call between independent conversations)."""
@@ -52,4 +71,5 @@ class PrivacySession:
         return len(self.mapping)
 
     def __repr__(self) -> str:
-        return f"PrivacySession({len(self)} entries)"
+        limit = f", max_size={self.max_size}" if self.max_size else ""
+        return f"PrivacySession({len(self)} entries{limit})"
