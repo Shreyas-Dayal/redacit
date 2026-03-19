@@ -1,0 +1,14 @@
+include README.md
+include LICENSE
+
+# Exclude planning docs, demo files, and test data from the package
+exclude RESTRUCTURE_PLAN.md
+exclude IMPLEMENTATION_PLAN.md
+exclude PRIVACY_LAYER_PLAN.md
+exclude PYPI_PACKAGING_CHECKLIST.md
+exclude demo.py
+exclude main.py
+recursive-exclude demo_data *
+recursive-exclude tests *
+recursive-exclude * __pycache__
+recursive-exclude * *.pyc
