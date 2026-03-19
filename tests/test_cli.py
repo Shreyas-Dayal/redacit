@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -155,3 +156,71 @@ class TestStatsCommand:
         assert result.exit_code == 0
         assert "Records   : 2" in result.output
         assert "Total PII : 3" in result.output
+
+
+# ---------------------------------------------------------------------------
+# init command (non-interactive mode)
+# ---------------------------------------------------------------------------
+
+class TestInitCommand:
+
+    def test_yes_flag_creates_config(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\nname = "test"\nversion = "0.1.0"\n')
+
+        result = runner.invoke(app, ["init", "--yes", "--no-install"])
+        assert result.exit_code == 0
+        assert "Config written" in result.output
+
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        cfg = data["tool"]["wrapper-llm"]
+        assert cfg["model"] == "en_core_web_sm"
+        assert cfg["score_threshold"] == 0.4
+        assert "EMAIL_ADDRESS" in cfg["entities"]
+
+    def test_flags_override_defaults(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\nname = "test"\n')
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--model", "none", "--provider", "anthropic", "--no-install"],
+        )
+        assert result.exit_code == 0
+
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        cfg = data["tool"]["wrapper-llm"]
+        assert cfg["model"] == "none"
+
+    def test_creates_pyproject_if_missing(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["init", "--yes", "--no-install"])
+        assert result.exit_code == 0
+
+        pyproject = tmp_path / "pyproject.toml"
+        assert pyproject.exists()
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        assert "wrapper-llm" in data.get("tool", {})
+
+    def test_quick_start_snippet_shown(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--provider", "anthropic", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert "PrivacyClient(Anthropic())" in result.output
+
+    def test_provider_none_shows_anonymize_snippet(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--provider", "none", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert "anonymize" in result.output

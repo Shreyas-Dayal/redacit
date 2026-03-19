@@ -132,3 +132,25 @@ class TestModelSelection:
         assert "346-12-5678" not in result.anonymized_text
         assert "4111-1111-1111-1111" not in result.anonymized_text
         assert "bob@test.com" not in result.anonymized_text
+
+    def test_model_none_string_is_regex_only(self):
+        """Config files store model as 'none' (string), not Python None."""
+        anon = Anonymizer(model="none")
+        result = anon.anonymize("Call John Smith please.")
+        assert result.anonymized_text == "Call John Smith please."
+
+    def test_config_from_pyproject(self, tmp_path, monkeypatch):
+        """Anonymizer reads [tool.wrapper-llm] from pyproject.toml."""
+        monkeypatch.chdir(tmp_path)
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text(
+            '[project]\nname = "test"\n\n'
+            "[tool.wrapper-llm]\n"
+            'model = "none"\n'
+            "score_threshold = 0.8\n"
+        )
+        anon = Anonymizer()
+        assert anon.score_threshold == 0.8
+        # model=none → regex only, so no person detection
+        result = anon.anonymize("Call John Smith please.")
+        assert result.anonymized_text == "Call John Smith please."
