@@ -176,7 +176,7 @@ class TestInitCommand:
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
         cfg = data["tool"]["wrapper-llm"]
-        assert cfg["model"] == "en_core_web_sm"
+        assert cfg["model"] == "en_core_web_md"
         assert cfg["score_threshold"] == 0.4
         assert "EMAIL_ADDRESS" in cfg["entities"]
 

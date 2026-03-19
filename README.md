@@ -52,8 +52,9 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 pip install wrapper-llm                  # base install — regex-only PII detection
-pip install "wrapper-llm[model-sm]"      # + person names, locations (11 MB model)
-pip install "wrapper-llm[model-lg]"      # + marginally better NER accuracy (560 MB)
+pip install "wrapper-llm[model-sm]"      # + person names, locations (11 MB)
+pip install "wrapper-llm[model-md]"      # + word vectors for better accuracy (43 MB, recommended)
+pip install "wrapper-llm[model-lg]"      # + max NER accuracy (560 MB)
 ```
 
 Copy `.env.example` to `.env` and add your API key for live LLM calls:
@@ -73,9 +74,10 @@ wrapper-llm auto-detects the best available spaCy model at startup. No configura
 |---|---|---|---|
 | `pip install wrapper-llm` | none (regex-only) | 0 MB | emails, SSNs, credit cards, phones, IBANs, API keys, bank accounts, EINs, URLs, IPs |
 | `pip install "wrapper-llm[model-sm]"` | en_core_web_sm | 11 MB | + person names, locations, organizations |
-| `pip install "wrapper-llm[model-lg]"` | en_core_web_lg | 560 MB | + marginally better NER accuracy (~0.8%) |
+| `pip install "wrapper-llm[model-md]"` | en_core_web_md | 43 MB | + word vectors for better NER accuracy (recommended) |
+| `pip install "wrapper-llm[model-lg]"` | en_core_web_lg | 560 MB | + marginally better accuracy over md |
 
-For most use cases, `model-sm` is the best balance. Use the base install for structured-PII-only use cases (financial data, API key scrubbing) where you want minimal container size.
+For most use cases, `model-md` is the best balance of size and accuracy. Use `model-sm` for minimal footprint, or the base install for structured-PII-only use cases (financial data, API key scrubbing).
 
 You can also select the model explicitly in code:
 

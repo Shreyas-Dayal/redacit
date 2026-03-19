@@ -542,6 +542,14 @@ wheels = [
 ]
 
 [[package]]
+name = "en-core-web-md"
+version = "3.8.0"
+source = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" }
+wheels = [
+    { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl", hash = "sha256:5e6329fe3fecedb1d1a02c3ea2172ee0fede6cea6e4aefb6a02d832dba78a310" },
+]
+
+[[package]]
 name = "en-core-web-sm"
 version = "3.8.0"
 source = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
@@ -2793,6 +2801,9 @@ litellm = [
 model-lg = [
     { name = "en-core-web-lg" },
 ]
+model-md = [
+    { name = "en-core-web-md" },
+]
 model-sm = [
     { name = "en-core-web-sm" },
 ]
@@ -2814,6 +2825,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "en-core-web-lg", marker = "extra == 'model-lg'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" },
+    { name = "en-core-web-md", marker = "extra == 'model-md'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" },
     { name = "en-core-web-sm", marker = "extra == 'model-sm'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.111" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.40" },
@@ -2827,7 +2839,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.29" },
 ]
-provides-extras = ["model-sm", "model-lg", "server", "litellm", "dev"]
+provides-extras = ["model-sm", "model-md", "model-lg", "server", "litellm", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

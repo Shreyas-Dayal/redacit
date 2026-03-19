@@ -34,7 +34,8 @@ app = typer.Typer(
 
 _MODEL_CHOICES = {
     "None   (regex-only, no download)": "none",
-    "en_core_web_sm  (11 MB, recommended)": "en_core_web_sm",
+    "en_core_web_sm  (11 MB, fast)": "en_core_web_sm",
+    "en_core_web_md  (43 MB, recommended)": "en_core_web_md",
     "en_core_web_lg  (560 MB, max accuracy)": "en_core_web_lg",
 }
 
@@ -100,7 +101,7 @@ def _prompt_model() -> str:
     label = questionary.select(
         "Which spaCy model do you want?",
         choices=list(_MODEL_CHOICES.keys()),
-        default=list(_MODEL_CHOICES.keys())[1],
+        default=list(_MODEL_CHOICES.keys())[2],  # en_core_web_md
     ).ask()
     if label is None:
         raise typer.Abort()
@@ -142,6 +143,7 @@ def _prompt_entities() -> list[str]:
 
 _MODEL_PACKAGES = {
     "en_core_web_sm": "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "en_core_web_md": "en-core-web-md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
     "en_core_web_lg": "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
 }
 
@@ -219,7 +221,7 @@ def _write_config(config: dict[str, Any], path: Path) -> None:
 @app.command()
 def init(
     yes: bool = typer.Option(False, "--yes", "-y", help="Accept all defaults, no prompts."),
-    model: str = typer.Option(None, "--model", "-m", help="Model: none, sm, lg."),
+    model: str = typer.Option(None, "--model", "-m", help="Model: none, sm, md, lg."),
     provider: str = typer.Option(None, "--provider", help="Provider: openai, anthropic, gemini, litellm, none."),
     server: bool = typer.Option(None, "--server/--no-server", help="Enable REST API server."),
     no_install: bool = typer.Option(False, "--no-install", help="Skip dependency installation."),
@@ -231,10 +233,10 @@ def init(
 
     if model is not None:
         # Normalize short names
-        model_map = {"sm": "en_core_web_sm", "lg": "en_core_web_lg", "none": "none"}
+        model_map = {"sm": "en_core_web_sm", "md": "en_core_web_md", "lg": "en_core_web_lg", "none": "none"}
         resolved_model = model_map.get(model, model)
     elif yes:
-        resolved_model = "en_core_web_sm"
+        resolved_model = "en_core_web_md"
     else:
         resolved_model = _prompt_model()
 

@@ -23,7 +23,7 @@ from .recognizers import build_custom_recognizers
 
 _log = logging.getLogger(__name__)
 
-_MODEL_CHAIN = ["en_core_web_lg", "en_core_web_sm"]
+_MODEL_CHAIN = ["en_core_web_lg", "en_core_web_md", "en_core_web_sm"]
 
 DEFAULT_ENTITIES = [
     # Built-in Presidio entities
