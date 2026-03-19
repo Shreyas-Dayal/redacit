@@ -19,9 +19,12 @@ Simplified API (works for any SDK):
 
 from __future__ import annotations
 
+import logging
 import os
 import warnings
 from typing import TYPE_CHECKING, Any, Callable
+
+_log = logging.getLogger(__name__)
 
 from ..anonymizer import Anonymizer
 from .._types import UnsupportedProviderError
