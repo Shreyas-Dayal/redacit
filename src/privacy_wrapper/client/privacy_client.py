@@ -19,11 +19,15 @@ Simplified API (works for any SDK):
 
 from __future__ import annotations
 
+import logging
 import os
 import warnings
 from typing import TYPE_CHECKING, Any, Callable
 
+_log = logging.getLogger(__name__)
+
 from ..anonymizer import Anonymizer
+from .._types import UnsupportedProviderError
 
 if TYPE_CHECKING:
     from ..audit import AuditLogger
@@ -117,9 +121,17 @@ class _OpenAICompletionsProxy:
         if user_texts:
             self._adapter._log("\n".join(user_texts), merged, model)
 
+        is_stream = kwargs.get("stream", False)
+        if is_stream:
+            _log.warning(
+                "OpenAI proxy streaming: input is anonymized but response "
+                "chunks will contain placeholders. Use .query() for full "
+                "deanonymization, or use OpenAIPrivacyClient.stream()."
+            )
+
         response = self._completions.create(messages=safe, **kwargs)
 
-        if hasattr(response, "choices"):
+        if not is_stream and hasattr(response, "choices"):
             for choice in response.choices:
                 if hasattr(choice, "message") and choice.message.content:
                     choice.message.content = self._adapter._deanonymize(
@@ -245,7 +257,7 @@ class _AnthropicMessagesProxy:
                     try:
                         block.text = self._adapter._deanonymize(block.text, mapping)
                     except (AttributeError, TypeError):
-                        pass  # frozen model — best-effort
+                        _log.debug("Could not mutate response field for deanonymization (frozen model?)")
 
         return response
 
@@ -278,8 +290,11 @@ class _AnthropicMessagesProxy:
 
         mapping = self._adapter._mapping(merged)
 
-        # Delegate to the real stream — return unwrapped for now
-        # (streaming deanonymization requires buffering, deferred to v2)
+        _log.warning(
+            "Anthropic proxy streaming: input is anonymized but response "
+            "text will contain placeholders. Use .query() for full "
+            "deanonymization, or use LiteLLMPrivacyClient.stream()."
+        )
         return self._messages.stream(messages=safe, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
@@ -349,7 +364,7 @@ class _GeminiModelsProxy:
                                 try:
                                     part.text = anon_text
                                 except (AttributeError, TypeError):
-                                    pass
+                                    _log.debug("Could not mutate Content part for anonymization (frozen model?)")
                     anon.append(item)
                 else:
                     anon.append(item)
@@ -362,7 +377,7 @@ class _GeminiModelsProxy:
                     try:
                         part.text = anon_text
                     except (AttributeError, TypeError):
-                        pass
+                        _log.debug("Could not mutate Content part for anonymization (frozen model?)")
                     return contents, m
         return contents, {}
 
@@ -376,7 +391,7 @@ class _GeminiModelsProxy:
             try:
                 config.system_instruction = anon_si
             except (AttributeError, TypeError):
-                pass
+                _log.debug("Could not mutate config.system_instruction (frozen model?)")
             return m
         return {}
 
@@ -403,7 +418,7 @@ class _GeminiModelsProxy:
                             try:
                                 part.text = self._adapter._deanonymize(part.text, mapping)
                             except (AttributeError, TypeError):
-                                pass
+                                _log.debug("Could not mutate response field for deanonymization (frozen model?)")
         return response
 
     def generate_content_stream(self, *, model: str, contents: Any, **kwargs: Any) -> Any:
@@ -413,7 +428,11 @@ class _GeminiModelsProxy:
         merged.update(self._anonymize_config(config))
         anon_contents, m = self._anonymize_contents(contents)
         merged.update(m)
-        # Return the raw stream — deanonymization of streamed chunks deferred to v2
+        _log.warning(
+            "Gemini proxy streaming: input is anonymized but response "
+            "text will contain placeholders. Use .query() for full "
+            "deanonymization, or use LiteLLMPrivacyClient.stream()."
+        )
         return self._models.generate_content_stream(model=model, contents=anon_contents, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
@@ -499,7 +518,7 @@ def _detect_adapter(
     for prefix, cls in _SDK_PREFIXES.items():
         if module.startswith(prefix):
             return cls(client, anonymizer, session, audit_logger)
-    raise TypeError(
+    raise UnsupportedProviderError(
         f"Unsupported SDK client: {module}.{type(client).__name__}. "
         "Pass call_fn=... for unsupported SDKs, or use LiteLLMPrivacyClient."
     )

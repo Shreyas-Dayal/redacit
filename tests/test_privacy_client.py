@@ -79,9 +79,11 @@ class TestDetection:
         assert isinstance(adapter, _GeminiAdapter)
 
     def test_unknown_raises(self):
+        from privacy_wrapper._types import UnsupportedProviderError
+
         client = _make_mock_client("cohere.client", "Client")
         anon = Anonymizer()
-        with pytest.raises(TypeError, match="Unsupported SDK client"):
+        with pytest.raises(UnsupportedProviderError, match="Unsupported SDK client"):
             _detect_adapter(client, anon, None, None)
 
 

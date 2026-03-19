@@ -9,13 +9,21 @@ from .client import (
 )
 from .formats import CsvAnonymizer, CsvRowResult, JsonAnonymizer, JsonRecordResult
 from .session import PrivacySession
-from ._types import FieldConfig, LLMClient, SidecarConfig
+from ._types import (
+    FieldConfig,
+    LLMClient,
+    ModelNotFoundError,
+    PrivacyWrapperError,
+    SidecarConfig,
+    UnsupportedProviderError,
+)
 
 __all__ = [
     # Core
     "Anonymizer",
     "AnonymizationResult",
     # Convenience — module-level wrappers around a shared Anonymizer instance
+    "configure",
     "anonymize",
     "deanonymize",
     # Clients
@@ -36,15 +44,34 @@ __all__ = [
     "FieldConfig",
     "SidecarConfig",
     "LLMClient",
+    # Exceptions
+    "PrivacyWrapperError",
+    "UnsupportedProviderError",
+    "ModelNotFoundError",
 ]
 
 _default_anonymizer: Anonymizer | None = None
+_default_model: str = "auto"
+
+
+def configure(model: str = "auto") -> None:
+    """Configure the shared module-level Anonymizer.
+
+    Must be called **before** the first ``anonymize()`` call to have effect.
+
+    Args:
+        model: spaCy model name, ``"auto"`` for auto-detect, or ``None``
+               for regex-only mode.
+    """
+    global _default_anonymizer, _default_model
+    _default_model = model
+    _default_anonymizer = None  # force re-creation on next use
 
 
 def _get_default() -> Anonymizer:
     global _default_anonymizer
     if _default_anonymizer is None:
-        _default_anonymizer = Anonymizer()
+        _default_anonymizer = Anonymizer(model=_default_model)
     return _default_anonymizer
 
 
@@ -53,7 +80,10 @@ def anonymize(
     entities: list[str] | None = None,
     score_threshold: float | None = None,
 ) -> AnonymizationResult:
-    """Anonymize *text* using a shared module-level Anonymizer instance."""
+    """Anonymize *text* using a shared module-level Anonymizer instance.
+
+    Call :func:`configure` first if you need to change the NLP model.
+    """
     return _get_default().anonymize(text, entities=entities, score_threshold=score_threshold)
 
 

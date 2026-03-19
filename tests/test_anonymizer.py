@@ -102,3 +102,33 @@ class TestRoundtrip:
         result = anon.anonymize(text)
         restored = anon.deanonymize(result.anonymized_text, result.mapping)
         assert restored == text
+
+
+class TestModelSelection:
+
+    def test_auto_finds_installed_model(self):
+        anon = Anonymizer(model="auto")
+        result = anon.anonymize("Call John Smith please.")
+        assert "John Smith" not in result.anonymized_text
+
+    def test_explicit_model(self):
+        anon = Anonymizer(model="en_core_web_lg")
+        result = anon.anonymize("Call John Smith please.")
+        assert "John Smith" not in result.anonymized_text
+
+    def test_regex_only_mode(self):
+        anon = Anonymizer(model=None)
+        # Regex entities still work
+        result = anon.anonymize("Email alice@example.com")
+        assert "alice@example.com" not in result.anonymized_text
+        # NER entities are not detected (no model)
+        result2 = anon.anonymize("Call John Smith please.")
+        assert result2.anonymized_text == "Call John Smith please."
+
+    def test_regex_only_detects_structured_pii(self):
+        anon = Anonymizer(model=None)
+        text = "SSN 346-12-5678, card 4111-1111-1111-1111, email bob@test.com"
+        result = anon.anonymize(text)
+        assert "346-12-5678" not in result.anonymized_text
+        assert "4111-1111-1111-1111" not in result.anonymized_text
+        assert "bob@test.com" not in result.anonymized_text
