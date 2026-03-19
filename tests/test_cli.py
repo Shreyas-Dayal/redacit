@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -155,3 +156,202 @@ class TestStatsCommand:
         assert result.exit_code == 0
         assert "Records   : 2" in result.output
         assert "Total PII : 3" in result.output
+
+
+# ---------------------------------------------------------------------------
+# init command (non-interactive mode)
+# ---------------------------------------------------------------------------
+
+class TestInitCommand:
+
+    def test_yes_flag_creates_config(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\nname = "test"\nversion = "0.1.0"\n')
+
+        result = runner.invoke(app, ["init", "--yes", "--no-install"])
+        assert result.exit_code == 0
+        assert "Config written" in result.output
+
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        cfg = data["tool"]["wrapper-llm"]
+        assert cfg["model"] == "en_core_web_md"
+        assert cfg["score_threshold"] == 0.4
+        assert "EMAIL_ADDRESS" in cfg["entities"]
+
+    def test_flags_override_defaults(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text('[project]\nname = "test"\n')
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--model", "none", "--provider", "anthropic", "--no-install"],
+        )
+        assert result.exit_code == 0
+
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        cfg = data["tool"]["wrapper-llm"]
+        assert cfg["model"] == "none"
+
+    def test_creates_pyproject_if_missing(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["init", "--yes", "--no-install"])
+        assert result.exit_code == 0
+
+        pyproject = tmp_path / "pyproject.toml"
+        assert pyproject.exists()
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+        assert "wrapper-llm" in data.get("tool", {})
+
+    def test_examples_generated_for_openai(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--provider", "openai", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / "examples" / "01_basic_usage.py").exists()
+        assert (tmp_path / "examples" / "02_query_api.py").exists()
+        assert (tmp_path / "examples" / "03_session.py").exists()
+        assert (tmp_path / "examples" / "04_audit_logging.py").exists()
+
+        basic = (tmp_path / "examples" / "01_basic_usage.py").read_text()
+        assert "PrivacyClient(OpenAI())" in basic
+
+    def test_examples_generated_for_anthropic(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--provider", "anthropic", "--no-install"],
+        )
+        assert result.exit_code == 0
+        basic = (tmp_path / "examples" / "01_basic_usage.py").read_text()
+        assert "PrivacyClient(Anthropic())" in basic
+
+        session = (tmp_path / "examples" / "03_session.py").read_text()
+        assert "PrivacySession" in session
+
+    def test_provider_none_generates_basic_only(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--provider", "none", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / "examples" / "01_basic_usage.py").exists()
+        # No query/session/audit examples for "none" provider
+        assert not (tmp_path / "examples" / "02_query_api.py").exists()
+
+    def test_examples_summary_printed(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert "Examples generated:" in result.output
+        assert "01_basic_usage.py" in result.output
+
+
+# ---------------------------------------------------------------------------
+# init --agent (AI agent instructions file)
+# ---------------------------------------------------------------------------
+
+class TestInitAgentFile:
+
+    def test_claude_md_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "claude", "--no-install"],
+        )
+        assert result.exit_code == 0
+        claude_md = tmp_path / "CLAUDE.md"
+        assert claude_md.exists()
+        content = claude_md.read_text()
+        assert "wrapper-llm" in content
+        assert "PrivacyClient" in content
+        assert "Never bypass" in content
+
+    def test_cursor_rules_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "cursor", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / ".cursorrules").exists()
+
+    def test_copilot_instructions_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "copilot", "--no-install"],
+        )
+        assert result.exit_code == 0
+        path = tmp_path / ".github" / "copilot-instructions.md"
+        assert path.exists()
+        assert "wrapper-llm" in path.read_text()
+
+    def test_codex_agents_md_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "codex", "--no-install"],
+        )
+        assert result.exit_code == 0
+        agents_md = tmp_path / "AGENTS.md"
+        assert agents_md.exists()
+        assert "wrapper-llm" in agents_md.read_text()
+
+    def test_antigravity_gemini_md_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "antigravity", "--no-install"],
+        )
+        assert result.exit_code == 0
+        gemini_md = tmp_path / "GEMINI.md"
+        assert gemini_md.exists()
+        assert "PrivacyClient" in gemini_md.read_text()
+
+    def test_all_generates_all_five(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "all", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / "CLAUDE.md").exists()
+        assert (tmp_path / "AGENTS.md").exists()
+        assert (tmp_path / "GEMINI.md").exists()
+        assert (tmp_path / ".cursorrules").exists()
+        assert (tmp_path / ".github" / "copilot-instructions.md").exists()
+
+    def test_none_skips_agent_file(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "none", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert not (tmp_path / "CLAUDE.md").exists()
+        assert not (tmp_path / ".cursorrules").exists()
+
+    def test_content_reflects_provider(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(
+            app, ["init", "--yes", "--agent", "claude", "--provider", "anthropic", "--no-install"],
+        )
+        content = (tmp_path / "CLAUDE.md").read_text()
+        assert "Anthropic" in content
+
+    def test_content_reflects_regex_only_model(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(
+            app, ["init", "--yes", "--agent", "claude", "--model", "none", "--no-install"],
+        )
+        content = (tmp_path / "CLAUDE.md").read_text()
+        assert "regex-only" in content
+
+    def test_yes_flag_skips_agent_by_default(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init", "--yes", "--no-install"])
+        assert not (tmp_path / "CLAUDE.md").exists()

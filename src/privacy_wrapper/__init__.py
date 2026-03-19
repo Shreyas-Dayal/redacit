@@ -66,6 +66,10 @@ def configure(model: str = "auto") -> None:
     global _default_anonymizer, _default_model
     _default_model = model
     _default_anonymizer = None  # force re-creation on next use
+    # Also reset the config cache so a fresh Anonymizer picks up any
+    # changes to pyproject.toml (relevant in interactive/notebook use).
+    from .anonymizer import reset_config_cache
+    reset_config_cache()
 
 
 def _get_default() -> Anonymizer:

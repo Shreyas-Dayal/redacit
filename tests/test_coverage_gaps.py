@@ -384,6 +384,8 @@ class TestConfigure:
         # Reset to default after each test
         privacy_wrapper._default_anonymizer = None
         privacy_wrapper._default_model = "auto"
+        from privacy_wrapper.anonymizer import reset_config_cache
+        reset_config_cache()
 
     def test_configure_sets_model(self):
         privacy_wrapper.configure(model=None)
