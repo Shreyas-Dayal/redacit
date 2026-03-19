@@ -13,8 +13,10 @@ from pathlib import Path
 
 import pytest
 
+import privacy_wrapper
 from privacy_wrapper import anonymize, deanonymize
 from privacy_wrapper.anonymizer import Anonymizer, AnonymizationResult
+from privacy_wrapper._types import ModelNotFoundError
 from privacy_wrapper.audit import AuditLogger
 from privacy_wrapper.session import PrivacySession
 
@@ -370,3 +372,83 @@ class TestStreaming:
         assert len(chunks) == 1
         # Even with character-level chunking, the final output is deanonymized
         assert "alice@example.com" in chunks[0]
+
+
+# ---------------------------------------------------------------------------
+# configure() module-level function
+# ---------------------------------------------------------------------------
+
+class TestConfigure:
+
+    def teardown_method(self):
+        # Reset to default after each test
+        privacy_wrapper._default_anonymizer = None
+        privacy_wrapper._default_model = "auto"
+
+    def test_configure_sets_model(self):
+        privacy_wrapper.configure(model=None)
+        result = privacy_wrapper.anonymize("Call John Smith please.")
+        # model=None → regex-only, person names not detected
+        assert result.anonymized_text == "Call John Smith please."
+
+    def test_configure_auto_detects(self):
+        privacy_wrapper.configure(model="auto")
+        result = privacy_wrapper.anonymize("Email alice@example.com")
+        assert "alice@example.com" not in result.anonymized_text
+
+    def test_configure_resets_cached_anonymizer(self):
+        # First call creates an Anonymizer
+        privacy_wrapper.anonymize("test")
+        assert privacy_wrapper._default_anonymizer is not None
+
+        # configure() should reset it
+        privacy_wrapper.configure(model=None)
+        assert privacy_wrapper._default_anonymizer is None
+
+        # Next call creates a new one with the new model
+        result = privacy_wrapper.anonymize("Call John Smith please.")
+        assert result.anonymized_text == "Call John Smith please."
+
+
+# ---------------------------------------------------------------------------
+# ModelNotFoundError
+# ---------------------------------------------------------------------------
+
+class TestModelNotFoundError:
+
+    def test_explicit_missing_model_raises(self):
+        with pytest.raises(ModelNotFoundError, match="not installed"):
+            Anonymizer(model="en_core_web_nonexistent_model_xyz")
+
+    def test_error_is_subclass_of_base(self):
+        from privacy_wrapper._types import PrivacyWrapperError
+
+        with pytest.raises(PrivacyWrapperError):
+            Anonymizer(model="en_core_web_nonexistent_model_xyz")
+
+
+# ---------------------------------------------------------------------------
+# PrivacyOpenAI (drop-in proxy)
+# ---------------------------------------------------------------------------
+
+class TestPrivacyOpenAI:
+
+    def test_import_works(self):
+        from privacy_wrapper import PrivacyOpenAI
+        assert PrivacyOpenAI is not None
+
+    def test_getattr_delegates(self):
+        from privacy_wrapper.client.openai_client import PrivacyOpenAI, _PrivacyChat
+        from unittest.mock import patch, MagicMock
+
+        with patch("privacy_wrapper.client.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            MockOpenAI.return_value = mock_instance
+            mock_instance.chat.completions = MagicMock()
+            mock_instance.embeddings = "mock_embeddings"
+
+            client = PrivacyOpenAI(api_key="sk-fake")
+            # chat should be intercepted
+            assert isinstance(client.chat, _PrivacyChat)
+            # other attrs delegate
+            assert client.embeddings == "mock_embeddings"
