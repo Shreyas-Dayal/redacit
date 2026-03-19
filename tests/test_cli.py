@@ -294,13 +294,35 @@ class TestInitAgentFile:
         assert path.exists()
         assert "wrapper-llm" in path.read_text()
 
-    def test_all_generates_all_three(self, tmp_path, monkeypatch):
+    def test_codex_agents_md_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "codex", "--no-install"],
+        )
+        assert result.exit_code == 0
+        agents_md = tmp_path / "AGENTS.md"
+        assert agents_md.exists()
+        assert "wrapper-llm" in agents_md.read_text()
+
+    def test_antigravity_gemini_md_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "antigravity", "--no-install"],
+        )
+        assert result.exit_code == 0
+        gemini_md = tmp_path / "GEMINI.md"
+        assert gemini_md.exists()
+        assert "PrivacyClient" in gemini_md.read_text()
+
+    def test_all_generates_all_five(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         result = runner.invoke(
             app, ["init", "--yes", "--agent", "all", "--no-install"],
         )
         assert result.exit_code == 0
         assert (tmp_path / "CLAUDE.md").exists()
+        assert (tmp_path / "AGENTS.md").exists()
+        assert (tmp_path / "GEMINI.md").exists()
         assert (tmp_path / ".cursorrules").exists()
         assert (tmp_path / ".github" / "copilot-instructions.md").exists()
 

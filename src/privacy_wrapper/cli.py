@@ -317,6 +317,8 @@ def _write_config(config: dict[str, Any], path: Path) -> None:
 
 _AGENT_CHOICES = {
     "CLAUDE.md       (Claude Code)": "claude",
+    "AGENTS.md       (Codex / shared)": "codex",
+    "GEMINI.md       (Antigravity)": "antigravity",
     ".cursorrules    (Cursor)": "cursor",
     "copilot         (.github/copilot-instructions.md)": "copilot",
     "All of the above": "all",
@@ -416,24 +418,24 @@ def _write_agent_file(content: str, agent: str) -> list[str]:
     """Write the agent instructions file(s). Returns list of paths written."""
     written: list[str] = []
 
+    _AGENT_PATHS = {
+        "claude": "CLAUDE.md",
+        "codex": "AGENTS.md",
+        "antigravity": "GEMINI.md",
+        "cursor": ".cursorrules",
+        "copilot": ".github/copilot-instructions.md",
+    }
+
     targets: list[str] = []
-    if agent in ("claude", "all"):
-        targets.append("claude")
-    if agent in ("cursor", "all"):
-        targets.append("cursor")
-    if agent in ("copilot", "all"):
-        targets.append("copilot")
+    if agent == "all":
+        targets = list(_AGENT_PATHS.keys())
+    elif agent in _AGENT_PATHS:
+        targets = [agent]
 
     for target in targets:
-        if target == "claude":
-            path = Path("CLAUDE.md")
-        elif target == "cursor":
-            path = Path(".cursorrules")
-        elif target == "copilot":
-            path = Path(".github") / "copilot-instructions.md"
+        path = Path(_AGENT_PATHS[target])
+        if path.parent != Path("."):
             path.parent.mkdir(parents=True, exist_ok=True)
-        else:
-            continue
 
         path.write_text(content)
         written.append(str(path))
