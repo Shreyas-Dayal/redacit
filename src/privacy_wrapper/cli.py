@@ -311,6 +311,136 @@ def _write_config(config: dict[str, Any], path: Path) -> None:
         f.write(section)
 
 
+# ---------------------------------------------------------------------------
+# AI agent instructions file
+# ---------------------------------------------------------------------------
+
+_AGENT_CHOICES = {
+    "CLAUDE.md       (Claude Code)": "claude",
+    ".cursorrules    (Cursor)": "cursor",
+    "copilot         (.github/copilot-instructions.md)": "copilot",
+    "All of the above": "all",
+    "None": "none",
+}
+
+
+def _build_agent_instructions(provider: str, model: str, entities: list[str]) -> str:
+    """Build the AI agent instructions content based on project config."""
+
+    import_line, client_init = _PROVIDER_IMPORTS.get(provider, _PROVIDER_IMPORTS["none"])
+
+    model_note = (
+        f"The project uses `{model}` for NER. "
+        if model not in ("none", "auto")
+        else "The project uses regex-only PII detection (no NLP model). "
+    )
+
+    entity_list = ", ".join(f"`{e}`" for e in entities[:8])
+    if len(entities) > 8:
+        entity_list += f", and {len(entities) - 8} more"
+
+    return f"""\
+# wrapper-llm Integration Guide
+
+This project uses **wrapper-llm** for automatic PII anonymization in LLM calls.
+{model_note}Detected entity types: {entity_list}.
+
+## How wrapper-llm works
+
+All text sent to an LLM is anonymized first (PII replaced with placeholders
+like `<PERSON_0>`, `<EMAIL_ADDRESS_0>`). The LLM response is then deanonymized
+(placeholders restored to original values). This happens transparently.
+
+## Key rules for AI agents
+
+1. **Never bypass the privacy wrapper.** All LLM calls must go through
+   `PrivacyClient` or the module-level `anonymize()`/`deanonymize()` functions.
+   Never call the LLM SDK directly for user-facing text.
+
+2. **Do not log or print the `mapping` dict.** It contains the original PII
+   values. Use `AuditLogger` for compliance-safe logging (metadata only).
+
+3. **Use the drop-in proxy pattern** — wrap the SDK client, don't change call sites:
+   ```python
+   {import_line}
+   from privacy_wrapper import PrivacyClient
+   client = PrivacyClient({client_init})
+   # All existing SDK call patterns work unchanged
+   ```
+
+4. **For multi-turn chat**, use `PrivacySession` to persist placeholder
+   mappings across turns:
+   ```python
+   from privacy_wrapper import PrivacyClient, PrivacySession
+   session = PrivacySession(max_size=500)
+   client = PrivacyClient({client_init}, session=session)
+   ```
+
+5. **For compliance logging**, pass an `AuditLogger`:
+   ```python
+   from privacy_wrapper import AuditLogger
+   with AuditLogger("audit.jsonl") as log:
+       client = PrivacyClient({client_init}, audit_logger=log)
+   ```
+
+## API reference
+
+| Class / Function | Purpose |
+|---|---|
+| `PrivacyClient(sdk_client)` | Drop-in proxy for any SDK (OpenAI, Anthropic, Gemini) |
+| `client.query(prompt)` | Simplified API: anonymize, call LLM, deanonymize |
+| `anonymize(text)` | Module-level anonymization (returns AnonymizationResult) |
+| `deanonymize(text, mapping)` | Restore placeholders to original values |
+| `Anonymizer(model=...)` | Core engine — `"auto"`, `"none"`, or explicit model name |
+| `PrivacySession(max_size=N)` | Cross-turn placeholder persistence |
+| `AuditLogger(path)` | Append-only JSONL log (metadata only, never raw text) |
+| `CsvAnonymizer` / `JsonAnonymizer` | Structured data anonymization |
+| `configure(model=...)` | Set module-level Anonymizer model before first use |
+
+## Configuration
+
+Project config is in `pyproject.toml` under `[tool.wrapper-llm]`.
+Constructor arguments override config values.
+
+## Common mistakes to avoid
+
+- Do not call `OpenAI()` / `Anthropic()` / `genai.Client()` directly for user text
+- Do not store `result.mapping` in logs, databases, or error messages
+- Do not forget `session.clear()` between independent conversations
+- Do not use `stream=True` in proxy mode if you need deanonymized output
+  (use `.query()` or `OpenAIPrivacyClient.stream()` instead)
+"""
+
+
+def _write_agent_file(content: str, agent: str) -> list[str]:
+    """Write the agent instructions file(s). Returns list of paths written."""
+    written: list[str] = []
+
+    targets: list[str] = []
+    if agent in ("claude", "all"):
+        targets.append("claude")
+    if agent in ("cursor", "all"):
+        targets.append("cursor")
+    if agent in ("copilot", "all"):
+        targets.append("copilot")
+
+    for target in targets:
+        if target == "claude":
+            path = Path("CLAUDE.md")
+        elif target == "cursor":
+            path = Path(".cursorrules")
+        elif target == "copilot":
+            path = Path(".github") / "copilot-instructions.md"
+            path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            continue
+
+        path.write_text(content)
+        written.append(str(path))
+
+    return written
+
+
 @app.command()
 def init(
     yes: bool = typer.Option(False, "--yes", "-y", help="Accept all defaults, no prompts."),
@@ -318,6 +448,7 @@ def init(
     provider: str = typer.Option(None, "--provider", help="Provider: openai, anthropic, gemini, litellm, none."),
     server: bool = typer.Option(None, "--server/--no-server", help="Enable REST API server."),
     no_install: bool = typer.Option(False, "--no-install", help="Skip dependency installation."),
+    agent: str = typer.Option(None, "--agent", help="AI agent file: claude, cursor, copilot, all, none."),
 ) -> None:
     """Interactive setup wizard for wrapper-llm."""
     typer.echo("\n  wrapper-llm setup\n")
@@ -385,6 +516,31 @@ def init(
 
     _write_config(config, pyproject)
     typer.echo(f"  Config written to {pyproject} [tool.wrapper-llm]")
+
+    # -- AI agent instructions file ----------------------------------------
+
+    if agent is not None:
+        resolved_agent = agent
+    elif yes:
+        resolved_agent = "none"
+    else:
+        import questionary
+        label = questionary.select(
+            "Generate AI agent instructions file?",
+            choices=list(_AGENT_CHOICES.keys()),
+            default=list(_AGENT_CHOICES.keys())[-1],  # None
+        ).ask()
+        if label is None:
+            raise typer.Abort()
+        resolved_agent = _AGENT_CHOICES[label]
+
+    if resolved_agent != "none":
+        agent_content = _build_agent_instructions(
+            resolved_provider, config_model, resolved_entities,
+        )
+        agent_files = _write_agent_file(agent_content, resolved_agent)
+        for f in agent_files:
+            typer.echo(f"  Agent file written: {f}")
 
     # -- Install packages --------------------------------------------------
 

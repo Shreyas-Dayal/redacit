@@ -255,3 +255,81 @@ class TestInitCommand:
         assert result.exit_code == 0
         assert "Examples generated:" in result.output
         assert "01_basic_usage.py" in result.output
+
+
+# ---------------------------------------------------------------------------
+# init --agent (AI agent instructions file)
+# ---------------------------------------------------------------------------
+
+class TestInitAgentFile:
+
+    def test_claude_md_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "claude", "--no-install"],
+        )
+        assert result.exit_code == 0
+        claude_md = tmp_path / "CLAUDE.md"
+        assert claude_md.exists()
+        content = claude_md.read_text()
+        assert "wrapper-llm" in content
+        assert "PrivacyClient" in content
+        assert "Never bypass" in content
+
+    def test_cursor_rules_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "cursor", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / ".cursorrules").exists()
+
+    def test_copilot_instructions_generated(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "copilot", "--no-install"],
+        )
+        assert result.exit_code == 0
+        path = tmp_path / ".github" / "copilot-instructions.md"
+        assert path.exists()
+        assert "wrapper-llm" in path.read_text()
+
+    def test_all_generates_all_three(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "all", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / "CLAUDE.md").exists()
+        assert (tmp_path / ".cursorrules").exists()
+        assert (tmp_path / ".github" / "copilot-instructions.md").exists()
+
+    def test_none_skips_agent_file(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(
+            app, ["init", "--yes", "--agent", "none", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert not (tmp_path / "CLAUDE.md").exists()
+        assert not (tmp_path / ".cursorrules").exists()
+
+    def test_content_reflects_provider(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(
+            app, ["init", "--yes", "--agent", "claude", "--provider", "anthropic", "--no-install"],
+        )
+        content = (tmp_path / "CLAUDE.md").read_text()
+        assert "Anthropic" in content
+
+    def test_content_reflects_regex_only_model(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(
+            app, ["init", "--yes", "--agent", "claude", "--model", "none", "--no-install"],
+        )
+        content = (tmp_path / "CLAUDE.md").read_text()
+        assert "regex-only" in content
+
+    def test_yes_flag_skips_agent_by_default(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init", "--yes", "--no-install"])
+        assert not (tmp_path / "CLAUDE.md").exists()
