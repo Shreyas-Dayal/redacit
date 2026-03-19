@@ -140,28 +140,38 @@ def _prompt_entities() -> list[str]:
     return selected
 
 
-def _build_extras(model: str, provider: str, server: bool) -> list[str]:
-    extras: list[str] = []
-    if model == "en_core_web_sm":
-        extras.append("model-sm")
-    elif model == "en_core_web_lg":
-        extras.append("model-lg")
+_MODEL_PACKAGES = {
+    "en_core_web_sm": "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "en_core_web_lg": "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
+}
+
+_EXTRA_PACKAGES = {
+    "server": ["fastapi>=0.111", "uvicorn[standard]>=0.29"],
+    "litellm": ["litellm>=1.40"],
+}
+
+
+def _collect_packages(model: str, provider: str, server: bool) -> list[str]:
+    """Return the list of pip-installable package specs based on user selections."""
+    packages: list[str] = []
+    if model in _MODEL_PACKAGES:
+        packages.append(_MODEL_PACKAGES[model])
     if server:
-        extras.append("server")
+        packages.extend(_EXTRA_PACKAGES["server"])
     if provider == "litellm":
-        extras.append("litellm")
-    return extras
+        packages.extend(_EXTRA_PACKAGES["litellm"])
+    return packages
 
 
-def _install_extras(extras: list[str]) -> None:
-    if not extras:
+def _install_packages(packages: list[str]) -> None:
+    """Install packages directly without re-installing wrapper-llm itself."""
+    if not packages:
         return
-    spec = f"wrapper-llm[{','.join(extras)}]"
     uv = shutil.which("uv")
     if uv:
-        cmd = [uv, "add", spec]
+        cmd = [uv, "pip", "install", *packages]
     else:
-        cmd = [sys.executable, "-m", "pip", "install", spec]
+        cmd = [sys.executable, "-m", "pip", "install", *packages]
     typer.echo(f"  Running: {' '.join(cmd)}")
     subprocess.run(cmd, check=False)
 
@@ -281,25 +291,29 @@ def init(
     _write_config(config, pyproject)
     typer.echo(f"  Config written to {pyproject} [tool.wrapper-llm]")
 
-    # -- Install extras ----------------------------------------------------
+    # -- Install packages --------------------------------------------------
 
-    extras = _build_extras(resolved_model, resolved_provider, resolved_server)
+    packages = _collect_packages(resolved_model, resolved_provider, resolved_server)
 
-    if extras and not no_install:
+    if packages and not no_install:
+        # Build a human-readable summary of what will be installed
+        pkg_names = [p.split("@")[0].split(">")[0].strip() for p in packages]
         if yes:
             do_install = True
         else:
             import questionary
             do_install = questionary.confirm(
-                f"Install dependencies ({', '.join(extras)})?", default=True,
+                f"Install dependencies ({', '.join(pkg_names)})?", default=True,
             ).ask()
             if do_install is None:
                 do_install = False
 
         if do_install:
-            _install_extras(extras)
-    elif extras:
-        typer.echo(f"\n  To install extras: pip install 'wrapper-llm[{','.join(extras)}]'")
+            _install_packages(packages)
+    elif packages:
+        typer.echo("\n  To install manually:")
+        for pkg in packages:
+            typer.echo(f"    pip install '{pkg}'")
 
     # -- Print quick-start snippet -----------------------------------------
 
