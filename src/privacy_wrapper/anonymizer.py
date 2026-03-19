@@ -164,20 +164,49 @@ def _provider_engine(model_name: str, language: str) -> SpacyNlpEngine:
     return NlpEngineProvider(nlp_configuration=config).create_engine()
 
 
-_SENTINEL = object()
+_NO_VALUE = "___UNSET___"
+
+_cached_project_config: dict | None = None
 
 
 def _load_project_config() -> dict:
-    """Load ``[tool.wrapper-llm]`` from pyproject.toml if it exists."""
+    """Load ``[tool.wrapper-llm]`` from ``pyproject.toml`` if it exists.
+
+    The result is cached after the first call so repeated ``Anonymizer()``
+    instantiations (e.g. in tests) don't re-read the file each time.
+
+    .. note::
+
+       The lookup uses the **current working directory** at the time of the
+       first call.  In deployed applications where the CWD differs from the
+       project root, the config will not be found — pass settings explicitly
+       via constructor arguments or :func:`privacy_wrapper.configure` instead.
+    """
+    global _cached_project_config
+    if _cached_project_config is not None:
+        return _cached_project_config
+
     path = Path("pyproject.toml")
     if not path.exists():
-        return {}
+        _cached_project_config = {}
+        return _cached_project_config
     try:
         with open(path, "rb") as f:
             data = tomllib.load(f)
-        return data.get("tool", {}).get("wrapper-llm", {})
+        _cached_project_config = data.get("tool", {}).get("wrapper-llm", {})
     except Exception:
-        return {}
+        _cached_project_config = {}
+    return _cached_project_config
+
+
+def reset_config_cache() -> None:
+    """Clear the cached project config so it is re-read on next use.
+
+    Primarily useful for tests that write a temporary ``pyproject.toml``
+    and need ``Anonymizer()`` to pick up the new values.
+    """
+    global _cached_project_config
+    _cached_project_config = None
 
 
 class Anonymizer:
@@ -186,7 +215,7 @@ class Anonymizer:
         entities: list[str] | None = None,
         score_threshold: float | None = None,
         language: str | None = None,
-        model: str | object = _SENTINEL,
+        model: str = _NO_VALUE,
     ):
         cfg = _load_project_config()
 
@@ -194,7 +223,7 @@ class Anonymizer:
         self.score_threshold = score_threshold if score_threshold is not None else cfg.get("score_threshold", 0.4)
         self.language = language or cfg.get("language", "en")
 
-        resolved_model = model if model is not _SENTINEL else cfg.get("model", "auto")
+        resolved_model = model if model != _NO_VALUE else cfg.get("model", "auto")
         nlp_engine = _build_nlp_engine(resolved_model, self.language)
         self._analyzer = AnalyzerEngine(
             nlp_engine=nlp_engine,

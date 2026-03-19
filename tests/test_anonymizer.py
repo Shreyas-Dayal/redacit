@@ -141,7 +141,10 @@ class TestModelSelection:
 
     def test_config_from_pyproject(self, tmp_path, monkeypatch):
         """Anonymizer reads [tool.wrapper-llm] from pyproject.toml."""
+        from privacy_wrapper.anonymizer import reset_config_cache
+
         monkeypatch.chdir(tmp_path)
+        reset_config_cache()
         pyproject = tmp_path / "pyproject.toml"
         pyproject.write_text(
             '[project]\nname = "test"\n\n'
@@ -150,6 +153,7 @@ class TestModelSelection:
             "score_threshold = 0.8\n"
         )
         anon = Anonymizer()
+        reset_config_cache()  # clean up for other tests
         assert anon.score_threshold == 0.8
         # model=none → regex only, so no person detection
         result = anon.anonymize("Call John Smith please.")
