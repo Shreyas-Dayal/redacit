@@ -349,9 +349,17 @@ This project uses **wrapper-llm** for automatic PII anonymization in LLM calls.
 
 ## How wrapper-llm works
 
-All text sent to an LLM is anonymized first (PII replaced with placeholders
-like `<PERSON_0>`, `<EMAIL_ADDRESS_0>`). The LLM response is then deanonymized
-(placeholders restored to original values). This happens transparently.
+```
+User text → Anonymizer (Presidio, in-process)
+  → replaces PII with placeholders: <PERSON_0>, <EMAIL_ADDRESS_0>
+  → records placeholder → original mapping
+  → sends anonymized text to LLM
+LLM response → Deanonymizer
+  → restores placeholders to original values
+  → returns clean response to app
+```
+
+Everything runs locally in-process. No external services, no Docker.
 
 ## Key rules for AI agents
 
@@ -362,47 +370,187 @@ like `<PERSON_0>`, `<EMAIL_ADDRESS_0>`). The LLM response is then deanonymized
 2. **Do not log or print the `mapping` dict.** It contains the original PII
    values. Use `AuditLogger` for compliance-safe logging (metadata only).
 
-3. **Use the drop-in proxy pattern** — wrap the SDK client, don't change call sites:
-   ```python
-   {import_line}
-   from privacy_wrapper import PrivacyClient
-   client = PrivacyClient({client_init})
-   # All existing SDK call patterns work unchanged
-   ```
+3. **Do not store PII in variables longer than needed.** After anonymization,
+   work with `result.anonymized_text` — the original text should not persist.
 
-4. **For multi-turn chat**, use `PrivacySession` to persist placeholder
-   mappings across turns:
-   ```python
-   from privacy_wrapper import PrivacyClient, PrivacySession
-   session = PrivacySession(max_size=500)
-   client = PrivacyClient({client_init}, session=session)
-   ```
+---
 
-5. **For compliance logging**, pass an `AuditLogger`:
-   ```python
-   from privacy_wrapper import AuditLogger
-   with AuditLogger("audit.jsonl") as log:
-       client = PrivacyClient({client_init}, audit_logger=log)
-   ```
+## Python integration examples
+
+### Drop-in proxy (recommended — zero call-site changes)
+
+```python
+{import_line}
+from privacy_wrapper import PrivacyClient
+
+# One line change — wrap your existing client
+client = PrivacyClient({client_init})
+
+# All existing SDK call patterns work unchanged
+# PII is anonymized before sending, restored in the response
+```
+
+### Simplified .query() API
+
+```python
+from privacy_wrapper import PrivacyClient
+{import_line}
+
+client = PrivacyClient({client_init})
+reply = client.query("Summarise the contract for Alice Jones at alice@corp.com")
+# Alice Jones and alice@corp.com never reach the LLM
+print(reply)
+```
+
+### Low-level anonymize / deanonymize (no LLM)
+
+```python
+from privacy_wrapper import anonymize, deanonymize
+
+result = anonymize("SSN: 346-12-5678, email: alice@corp.com")
+print(result.anonymized_text)  # SSN: <US_SSN_0>, email: <EMAIL_ADDRESS_0>
+print(result.mapping)          # {{'<US_SSN_0>': '346-12-5678', ...}}
+
+# After your own LLM call:
+restored = deanonymize(llm_response, result.mapping)
+```
+
+### Multi-turn session
+
+```python
+from privacy_wrapper import PrivacyClient, PrivacySession
+{import_line}
+
+session = PrivacySession(max_size=500)
+client = PrivacyClient({client_init}, session=session)
+
+client.query("My name is Alice Jones")      # <PERSON_0> → Alice stored
+client.query("What is my name?")            # placeholder resolved across turns
+session.clear()                             # reset between conversations
+```
+
+### Audit logging
+
+```python
+from privacy_wrapper import PrivacyClient, AuditLogger
+{import_line}
+
+with AuditLogger("privacy_audit.jsonl") as log:
+    client = PrivacyClient({client_init}, audit_logger=log)
+    client.query("Wire $50,000 to account 7823901645")
+
+# Log contains metadata only — never raw text or PII values:
+# {{"ts": "...", "input_hash": "a3f9...", "entity_counts": {{"US_BANK_ACCOUNT": 1}}, ...}}
+```
+
+### Structured data (CSV / JSON)
+
+```python
+from privacy_wrapper import CsvAnonymizer, JsonAnonymizer
+
+# CSV — one result per row
+for row in CsvAnonymizer().anonymize_file("customers.csv"):
+    print(row.anonymized)      # dict with PII replaced per column
+    print(row.flat_mapping)    # combined placeholder map
+
+# JSON — one result per record (handles nested structures)
+for rec in JsonAnonymizer().anonymize_file("records.json"):
+    print(rec.anonymized)      # nested dict with PII replaced
+```
+
+### FastAPI / Django integration
+
+```python
+{import_line}
+from privacy_wrapper import PrivacyClient
+
+# Create once at startup / in dependency injection
+client = PrivacyClient({client_init})
+
+# Use in any route — all calls are privacy-aware automatically
+@app.post("/chat")
+def chat(body: dict):
+    reply = client.query(body["message"])
+    return {{"reply": reply}}
+```
+
+---
+
+## CLI usage
+
+```bash
+# Quick anonymization check
+wrapper-llm anonymize "John Smith at john@acme.com, SSN 346-12-5678"
+
+# Filter to specific entity types
+wrapper-llm anonymize "John Smith at john@acme.com" --entity PERSON --entity EMAIL_ADDRESS
+
+# Adjust detection confidence
+wrapper-llm anonymize "some text" --threshold 0.6
+
+# Start the REST API server
+wrapper-llm serve --host 0.0.0.0 --port 8000
+
+# Analyse an audit log
+wrapper-llm stats privacy_audit.jsonl --top 5
+```
+
+### REST API endpoints (when server is running)
+
+```bash
+# Anonymize text
+curl -X POST http://localhost:8000/anonymize \\
+  -H "Content-Type: application/json" \\
+  -d '{{"text": "Email alice@corp.com"}}'
+
+# Deanonymize
+curl -X POST http://localhost:8000/deanonymize \\
+  -H "Content-Type: application/json" \\
+  -d '{{"text": "Email <EMAIL_ADDRESS_0>", "mapping": {{"<EMAIL_ADDRESS_0>": "alice@corp.com"}}}}'
+
+# Chat proxy (requires OPENAI_API_KEY on server)
+curl -X POST http://localhost:8000/chat \\
+  -H "Content-Type: application/json" \\
+  -d '{{"prompt": "Summarise this for Alice Jones"}}'
+
+# Health check
+curl http://localhost:8000/health
+
+# OpenAPI docs
+# http://localhost:8000/docs
+```
+
+---
 
 ## API reference
 
 | Class / Function | Purpose |
 |---|---|
 | `PrivacyClient(sdk_client)` | Drop-in proxy for any SDK (OpenAI, Anthropic, Gemini) |
-| `client.query(prompt)` | Simplified API: anonymize, call LLM, deanonymize |
-| `anonymize(text)` | Module-level anonymization (returns AnonymizationResult) |
+| `client.query(prompt)` | Simplified API: anonymize → call LLM → deanonymize |
+| `anonymize(text)` | Module-level anonymization (returns `AnonymizationResult`) |
 | `deanonymize(text, mapping)` | Restore placeholders to original values |
 | `Anonymizer(model=...)` | Core engine — `"auto"`, `"none"`, or explicit model name |
-| `PrivacySession(max_size=N)` | Cross-turn placeholder persistence |
+| `PrivacySession(max_size=N)` | Cross-turn placeholder persistence with LRU eviction |
 | `AuditLogger(path)` | Append-only JSONL log (metadata only, never raw text) |
-| `CsvAnonymizer` / `JsonAnonymizer` | Structured data anonymization |
+| `CsvAnonymizer` | Row-by-row CSV anonymization with sidecar config |
+| `JsonAnonymizer` | Record-by-record JSON anonymization (handles nesting) |
 | `configure(model=...)` | Set module-level Anonymizer model before first use |
+| `OpenAIPrivacyClient` | Simplified `.chat()` / `.stream()` API (OpenAI only) |
+| `LiteLLMPrivacyClient(model)` | Multi-provider via LiteLLM (`"anthropic/claude-..."`) |
 
 ## Configuration
 
-Project config is in `pyproject.toml` under `[tool.wrapper-llm]`.
-Constructor arguments override config values.
+Project config is in `pyproject.toml` under `[tool.wrapper-llm]`:
+
+```toml
+[tool.wrapper-llm]
+model = "{model}"
+score_threshold = 0.4
+entities = [...]
+```
+
+Constructor arguments override config values. Config values override defaults.
 
 ## Common mistakes to avoid
 
@@ -411,6 +559,7 @@ Constructor arguments override config values.
 - Do not forget `session.clear()` between independent conversations
 - Do not use `stream=True` in proxy mode if you need deanonymized output
   (use `.query()` or `OpenAIPrivacyClient.stream()` instead)
+- Do not hardcode entity types — use the configured defaults from `pyproject.toml`
 """
 
 
