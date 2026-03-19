@@ -9,7 +9,9 @@ Flow:
 from __future__ import annotations
 
 import logging
+import tomllib
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import spacy
 from presidio_analyzer import AnalyzerEngine
@@ -91,7 +93,7 @@ def _build_nlp_engine(model: str | None, language: str) -> SpacyNlpEngine:
     default ``NerModelConfiguration`` (including ``labels_to_ignore``) is
     preserved exactly as it would be with a bare ``AnalyzerEngine()``.
     """
-    if model is None:
+    if model is None or model == "none":
         _log.info("NLP model disabled — using regex-only detection")
         return _LoadedSpacyNlpEngine(spacy.blank(language))
 
@@ -162,21 +164,41 @@ def _provider_engine(model_name: str, language: str) -> SpacyNlpEngine:
     return NlpEngineProvider(nlp_configuration=config).create_engine()
 
 
+_SENTINEL = object()
+
+
+def _load_project_config() -> dict:
+    """Load ``[tool.wrapper-llm]`` from pyproject.toml if it exists."""
+    path = Path("pyproject.toml")
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+        return data.get("tool", {}).get("wrapper-llm", {})
+    except Exception:
+        return {}
+
+
 class Anonymizer:
     def __init__(
         self,
-        entities: list[str] = DEFAULT_ENTITIES,
-        score_threshold: float = 0.4,
-        language: str = "en",
-        model: str = "auto",
+        entities: list[str] | None = None,
+        score_threshold: float | None = None,
+        language: str | None = None,
+        model: str | object = _SENTINEL,
     ):
-        self.entities = entities
-        self.score_threshold = score_threshold
-        self.language = language
-        nlp_engine = _build_nlp_engine(model, language)
+        cfg = _load_project_config()
+
+        self.entities = entities or cfg.get("entities", DEFAULT_ENTITIES)
+        self.score_threshold = score_threshold if score_threshold is not None else cfg.get("score_threshold", 0.4)
+        self.language = language or cfg.get("language", "en")
+
+        resolved_model = model if model is not _SENTINEL else cfg.get("model", "auto")
+        nlp_engine = _build_nlp_engine(resolved_model, self.language)
         self._analyzer = AnalyzerEngine(
             nlp_engine=nlp_engine,
-            supported_languages=[language],
+            supported_languages=[self.language],
         )
         for recognizer in build_custom_recognizers():
             self._analyzer.registry.add_recognizer(recognizer)
