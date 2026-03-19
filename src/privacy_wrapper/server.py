@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from importlib.metadata import version as _pkg_version
 
 try:
     from fastapi import FastAPI, HTTPException
@@ -39,7 +40,7 @@ def _get_anonymizer() -> Anonymizer:
 app = FastAPI(
     title="wrapper-llm",
     description="Privacy-preserving LLM proxy with PII anonymization.",
-    version="0.1.0",
+    version=_pkg_version("wrapper-llm"),
 )
 
 
