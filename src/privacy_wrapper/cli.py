@@ -53,46 +53,139 @@ _DEFAULT_ENTITIES = [
     "IBAN_CODE", "US_BANK_ACCOUNT", "US_ROUTING_NUMBER", "EIN", "API_KEY",
 ]
 
-_PROVIDER_SNIPPETS = {
-    "openai": (
-        "from privacy_wrapper import PrivacyClient\n"
-        "from openai import OpenAI\n\n"
-        "client = PrivacyClient(OpenAI())\n"
-        "response = client.chat.completions.create(\n"
-        '    model="gpt-4o-mini",\n'
-        '    messages=[{"role": "user", "content": "Hello"}],\n'
-        ")"
-    ),
-    "anthropic": (
-        "from privacy_wrapper import PrivacyClient\n"
-        "from anthropic import Anthropic\n\n"
-        "client = PrivacyClient(Anthropic())\n"
-        "response = client.messages.create(\n"
-        '    model="claude-sonnet-4-5-20250929",\n'
-        "    max_tokens=256,\n"
-        '    messages=[{"role": "user", "content": "Hello"}],\n'
-        ")"
-    ),
-    "gemini": (
-        "from privacy_wrapper import PrivacyClient\n"
-        "from google import genai\n\n"
-        "client = PrivacyClient(genai.Client())\n"
-        "response = client.models.generate_content(\n"
-        '    model="gemini-2.0-flash",\n'
-        '    contents="Hello",\n'
-        ")"
-    ),
-    "litellm": (
-        "from privacy_wrapper import LiteLLMPrivacyClient\n\n"
-        'client = LiteLLMPrivacyClient("openai/gpt-4o-mini")\n'
-        'reply = client.chat("Hello")'
-    ),
-    "none": (
-        "from privacy_wrapper import anonymize, deanonymize\n\n"
-        'result = anonymize("Email alice@corp.com")\n'
-        "print(result.anonymized_text)\n"
-        "print(result.mapping)"
-    ),
+def _example_dropin(provider: str) -> str:
+    """Generate a drop-in proxy example for the selected provider."""
+    if provider == "openai":
+        return '''\
+"""Drop-in proxy — one line change to add privacy to existing OpenAI code."""
+from openai import OpenAI
+from privacy_wrapper import PrivacyClient
+
+# Wrap your existing client — all call sites stay identical
+client = PrivacyClient(OpenAI())
+
+response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {"role": "user", "content": "Summarise the contract for Alice Jones at alice@corp.com"}
+    ],
+)
+# Alice Jones and alice@corp.com were anonymized before the API call
+# and restored in the response automatically
+print(response.choices[0].message.content)
+'''
+    if provider == "anthropic":
+        return '''\
+"""Drop-in proxy — one line change to add privacy to existing Anthropic code."""
+from anthropic import Anthropic
+from privacy_wrapper import PrivacyClient
+
+client = PrivacyClient(Anthropic())
+
+response = client.messages.create(
+    model="claude-sonnet-4-5-20250929",
+    max_tokens=256,
+    messages=[
+        {"role": "user", "content": "Summarise the contract for Alice Jones at alice@corp.com"}
+    ],
+)
+print(response.content[0].text)
+'''
+    if provider == "gemini":
+        return '''\
+"""Drop-in proxy — one line change to add privacy to existing Gemini code."""
+from google import genai
+from privacy_wrapper import PrivacyClient
+
+client = PrivacyClient(genai.Client())
+
+response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents="Summarise the contract for Alice Jones at alice@corp.com",
+)
+print(response.text)
+'''
+    if provider == "litellm":
+        return '''\
+"""Multi-provider client via LiteLLM — works with any LLM provider."""
+from privacy_wrapper import LiteLLMPrivacyClient
+
+# Change the model string to switch providers:
+#   "openai/gpt-4o-mini", "anthropic/claude-sonnet-4-5-20250929",
+#   "gemini/gemini-2.0-flash", "ollama/llama3"
+client = LiteLLMPrivacyClient("openai/gpt-4o-mini")
+
+reply = client.chat("Summarise the contract for Alice Jones at alice@corp.com")
+print(reply)
+'''
+    # provider == "none" or unknown
+    return '''\
+"""Anonymize and deanonymize without calling an LLM."""
+from privacy_wrapper import anonymize, deanonymize
+
+text = "Email alice@corp.com, SSN 346-12-5678, card 4111-1111-1111-1111"
+
+result = anonymize(text)
+print("Anonymized:", result.anonymized_text)
+print("Mapping:", result.mapping)
+
+# After getting a response from your own LLM call:
+# restored = deanonymize(llm_response, result.mapping)
+'''
+
+
+_EXAMPLE_SIMPLIFIED = '''\
+"""Simplified .query() API — works with any SDK client."""
+from privacy_wrapper import PrivacyClient
+{import_line}
+
+client = PrivacyClient({client_init})
+
+# .query() handles anonymize -> LLM call -> deanonymize in one step
+reply = client.query("Summarise the contract for Alice Jones at alice@corp.com")
+print(reply)
+'''
+
+_EXAMPLE_SESSION = '''\
+"""Multi-turn conversation with session persistence."""
+from privacy_wrapper import PrivacyClient, PrivacySession
+{import_line}
+
+session = PrivacySession(max_size=500)
+client = PrivacyClient({client_init}, session=session)
+
+# Turn 1: PII is mapped and stored in the session
+reply1 = client.query("My name is Alice Jones, email alice@corp.com")
+print("Turn 1:", reply1)
+
+# Turn 2: Placeholders from turn 1 are still resolvable
+reply2 = client.query("What is my email?")
+print("Turn 2:", reply2)
+
+# New conversation — clear the session
+session.clear()
+'''
+
+_EXAMPLE_AUDIT = '''\
+"""Audit logging — metadata-only compliance log (never stores raw text)."""
+from privacy_wrapper import PrivacyClient, AuditLogger
+{import_line}
+
+with AuditLogger("privacy_audit.jsonl") as log:
+    client = PrivacyClient({client_init}, audit_logger=log)
+    reply = client.query("Wire $50,000 to account 7823901645 for Alice Jones")
+    print(reply)
+
+# Analyse the log:
+#   wrapper-llm stats privacy_audit.jsonl
+'''
+
+_PROVIDER_IMPORTS = {
+    "openai":    ("from openai import OpenAI", "OpenAI()"),
+    "anthropic": ("from anthropic import Anthropic", "Anthropic()"),
+    "gemini":    ("from google import genai", "genai.Client()"),
+    "litellm":   ("from privacy_wrapper import LiteLLMPrivacyClient", 'LiteLLMPrivacyClient("openai/gpt-4o-mini")'),
+    "none":      ("", ""),
 }
 
 
@@ -317,12 +410,59 @@ def init(
         for pkg in packages:
             typer.echo(f"    pip install '{pkg}'")
 
-    # -- Print quick-start snippet -----------------------------------------
+    # -- Generate example files --------------------------------------------
 
-    snippet = _PROVIDER_SNIPPETS.get(resolved_provider, _PROVIDER_SNIPPETS["none"])
+    examples_dir = Path("examples")
+    examples_dir.mkdir(exist_ok=True)
+
+    import_line, client_init = _PROVIDER_IMPORTS.get(
+        resolved_provider, _PROVIDER_IMPORTS["none"]
+    )
+
+    files_written: list[str] = []
+
+    # 1. Drop-in proxy / basic usage
+    dropin = _example_dropin(resolved_provider)
+    (examples_dir / "01_basic_usage.py").write_text(dropin)
+    files_written.append("examples/01_basic_usage.py")
+
+    # 2. Simplified .query() API (skip for "none" provider)
+    if resolved_provider != "none":
+        simplified = _EXAMPLE_SIMPLIFIED.format(
+            import_line=import_line, client_init=client_init,
+        )
+        (examples_dir / "02_query_api.py").write_text(simplified)
+        files_written.append("examples/02_query_api.py")
+
+    # 3. Multi-turn session (skip for "none" provider)
+    if resolved_provider != "none":
+        session_ex = _EXAMPLE_SESSION.format(
+            import_line=import_line, client_init=client_init,
+        )
+        (examples_dir / "03_session.py").write_text(session_ex)
+        files_written.append("examples/03_session.py")
+
+    # 4. Audit logging (skip for "none" provider)
+    if resolved_provider != "none":
+        audit_ex = _EXAMPLE_AUDIT.format(
+            import_line=import_line, client_init=client_init,
+        )
+        (examples_dir / "04_audit_logging.py").write_text(audit_ex)
+        files_written.append("examples/04_audit_logging.py")
+
+    # -- Print summary -----------------------------------------------------
+
+    typer.echo("\n  Examples generated:")
+    for f in files_written:
+        typer.echo(f"    {f}")
+
     typer.echo("\n  Quick start:\n")
-    for line in snippet.splitlines():
+    # Show first 6 lines of the basic example as a preview
+    preview = dropin.strip().splitlines()
+    for line in preview[:8]:
         typer.echo(f"    {line}")
+    if len(preview) > 8:
+        typer.echo(f"    ...  (see {files_written[0]} for full example)")
     typer.echo()
 
 

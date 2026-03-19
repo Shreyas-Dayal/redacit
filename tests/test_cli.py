@@ -207,20 +207,51 @@ class TestInitCommand:
             data = tomllib.load(f)
         assert "wrapper-llm" in data.get("tool", {})
 
-    def test_quick_start_snippet_shown(self, tmp_path, monkeypatch):
+    def test_examples_generated_for_openai(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--provider", "openai", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert (tmp_path / "examples" / "01_basic_usage.py").exists()
+        assert (tmp_path / "examples" / "02_query_api.py").exists()
+        assert (tmp_path / "examples" / "03_session.py").exists()
+        assert (tmp_path / "examples" / "04_audit_logging.py").exists()
+
+        basic = (tmp_path / "examples" / "01_basic_usage.py").read_text()
+        assert "PrivacyClient(OpenAI())" in basic
+
+    def test_examples_generated_for_anthropic(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(
             app, ["init", "--yes", "--provider", "anthropic", "--no-install"],
         )
         assert result.exit_code == 0
-        assert "PrivacyClient(Anthropic())" in result.output
+        basic = (tmp_path / "examples" / "01_basic_usage.py").read_text()
+        assert "PrivacyClient(Anthropic())" in basic
 
-    def test_provider_none_shows_anonymize_snippet(self, tmp_path, monkeypatch):
+        session = (tmp_path / "examples" / "03_session.py").read_text()
+        assert "PrivacySession" in session
+
+    def test_provider_none_generates_basic_only(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
 
         result = runner.invoke(
             app, ["init", "--yes", "--provider", "none", "--no-install"],
         )
         assert result.exit_code == 0
-        assert "anonymize" in result.output
+        assert (tmp_path / "examples" / "01_basic_usage.py").exists()
+        # No query/session/audit examples for "none" provider
+        assert not (tmp_path / "examples" / "02_query_api.py").exists()
+
+    def test_examples_summary_printed(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app, ["init", "--yes", "--no-install"],
+        )
+        assert result.exit_code == 0
+        assert "Examples generated:" in result.output
+        assert "01_basic_usage.py" in result.output
