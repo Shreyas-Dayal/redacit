@@ -1,5 +1,5 @@
 """
-Templates and helpers for the ``wrapper-llm init`` wizard.
+Templates and helpers for the ``redacit init`` wizard.
 
 Separated from cli.py to keep the CLI module focused on command
 definitions and argument parsing. This module owns:
@@ -23,7 +23,7 @@ PROVIDER_IMPORTS = {
     "openai":    ("from openai import OpenAI", "OpenAI()"),
     "anthropic": ("from anthropic import Anthropic", "Anthropic()"),
     "gemini":    ("from google import genai", "genai.Client()"),
-    "litellm":   ("from privacy_wrapper import LiteLLMPrivacyClient", 'LiteLLMPrivacyClient("openai/gpt-4o-mini")'),
+    "litellm":   ("from redacit import LiteLLMPrivacyClient", 'LiteLLMPrivacyClient("openai/gpt-4o-mini")'),
     "none":      ("", ""),
 }
 
@@ -38,7 +38,7 @@ def example_dropin(provider: str) -> str:
         return '''\
 """Drop-in proxy — one line change to add privacy to existing OpenAI code."""
 from openai import OpenAI
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 
 # Wrap your existing client — all call sites stay identical
 client = PrivacyClient(OpenAI())
@@ -57,7 +57,7 @@ print(response.choices[0].message.content)
         return '''\
 """Drop-in proxy — one line change to add privacy to existing Anthropic code."""
 from anthropic import Anthropic
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 
 client = PrivacyClient(Anthropic())
 
@@ -74,7 +74,7 @@ print(response.content[0].text)
         return '''\
 """Drop-in proxy — one line change to add privacy to existing Gemini code."""
 from google import genai
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 
 client = PrivacyClient(genai.Client())
 
@@ -87,7 +87,7 @@ print(response.text)
     if provider == "litellm":
         return '''\
 """Multi-provider client via LiteLLM — works with any LLM provider."""
-from privacy_wrapper import LiteLLMPrivacyClient
+from redacit import LiteLLMPrivacyClient
 
 # Change the model string to switch providers:
 #   "openai/gpt-4o-mini", "anthropic/claude-sonnet-4-5-20250929",
@@ -100,7 +100,7 @@ print(reply)
     # provider == "none" or unknown
     return '''\
 """Anonymize and deanonymize without calling an LLM."""
-from privacy_wrapper import anonymize, deanonymize
+from redacit import anonymize, deanonymize
 
 text = "Email alice@corp.com, SSN 346-12-5678, card 4111-1111-1111-1111"
 
@@ -115,7 +115,7 @@ print("Mapping:", result.mapping)
 
 EXAMPLE_SIMPLIFIED = '''\
 """Simplified .query() API — works with any SDK client."""
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 {import_line}
 
 client = PrivacyClient({client_init})
@@ -127,7 +127,7 @@ print(reply)
 
 EXAMPLE_SESSION = '''\
 """Multi-turn conversation with session persistence."""
-from privacy_wrapper import PrivacyClient, PrivacySession
+from redacit import PrivacyClient, PrivacySession
 {import_line}
 
 session = PrivacySession(max_size=500)
@@ -147,7 +147,7 @@ session.clear()
 
 EXAMPLE_AUDIT = '''\
 """Audit logging — metadata-only compliance log (never stores raw text)."""
-from privacy_wrapper import PrivacyClient, AuditLogger
+from redacit import PrivacyClient, AuditLogger
 {import_line}
 
 with AuditLogger("privacy_audit.jsonl") as log:
@@ -156,7 +156,7 @@ with AuditLogger("privacy_audit.jsonl") as log:
     print(reply)
 
 # Analyse the log:
-#   wrapper-llm stats privacy_audit.jsonl
+#   redacit stats privacy_audit.jsonl
 '''
 
 
@@ -235,12 +235,12 @@ def build_agent_instructions(provider: str, model: str, entities: list[str]) -> 
         entity_list += f", and {len(entities) - 8} more"
 
     return f"""\
-# wrapper-llm Integration Guide
+# redacit Integration Guide
 
-This project uses **wrapper-llm** for automatic PII anonymization in LLM calls.
+This project uses **redacit** for automatic PII anonymization in LLM calls.
 {model_note}Detected entity types: {entity_list}.
 
-## How wrapper-llm works
+## How redacit works
 
 ```
 User text → Anonymizer (Presidio, in-process)
@@ -274,7 +274,7 @@ Everything runs locally in-process. No external services, no Docker.
 
 ```python
 {import_line}
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 
 # One line change — wrap your existing client
 client = PrivacyClient({client_init})
@@ -286,7 +286,7 @@ client = PrivacyClient({client_init})
 ### Simplified .query() API
 
 ```python
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 {import_line}
 
 client = PrivacyClient({client_init})
@@ -298,7 +298,7 @@ print(reply)
 ### Low-level anonymize / deanonymize (no LLM)
 
 ```python
-from privacy_wrapper import anonymize, deanonymize
+from redacit import anonymize, deanonymize
 
 result = anonymize("SSN: 346-12-5678, email: alice@corp.com")
 print(result.anonymized_text)  # SSN: <US_SSN_0>, email: <EMAIL_ADDRESS_0>
@@ -311,7 +311,7 @@ restored = deanonymize(llm_response, result.mapping)
 ### Multi-turn session
 
 ```python
-from privacy_wrapper import PrivacyClient, PrivacySession
+from redacit import PrivacyClient, PrivacySession
 {import_line}
 
 session = PrivacySession(max_size=500)
@@ -325,7 +325,7 @@ session.clear()                             # reset between conversations
 ### Audit logging
 
 ```python
-from privacy_wrapper import PrivacyClient, AuditLogger
+from redacit import PrivacyClient, AuditLogger
 {import_line}
 
 with AuditLogger("privacy_audit.jsonl") as log:
@@ -339,7 +339,7 @@ with AuditLogger("privacy_audit.jsonl") as log:
 ### Structured data (CSV / JSON)
 
 ```python
-from privacy_wrapper import CsvAnonymizer, JsonAnonymizer
+from redacit import CsvAnonymizer, JsonAnonymizer
 
 # CSV — one result per row
 for row in CsvAnonymizer().anonymize_file("customers.csv"):
@@ -355,7 +355,7 @@ for rec in JsonAnonymizer().anonymize_file("records.json"):
 
 ```python
 {import_line}
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 
 # Create once at startup / in dependency injection
 client = PrivacyClient({client_init})
@@ -373,19 +373,19 @@ def chat(body: dict):
 
 ```bash
 # Quick anonymization check
-wrapper-llm anonymize "John Smith at john@acme.com, SSN 346-12-5678"
+redacit anonymize "John Smith at john@acme.com, SSN 346-12-5678"
 
 # Filter to specific entity types
-wrapper-llm anonymize "John Smith at john@acme.com" --entity PERSON --entity EMAIL_ADDRESS
+redacit anonymize "John Smith at john@acme.com" --entity PERSON --entity EMAIL_ADDRESS
 
 # Adjust detection confidence
-wrapper-llm anonymize "some text" --threshold 0.6
+redacit anonymize "some text" --threshold 0.6
 
 # Start the REST API server
-wrapper-llm serve --host 0.0.0.0 --port 8000
+redacit serve --host 0.0.0.0 --port 8000
 
 # Analyse an audit log
-wrapper-llm stats privacy_audit.jsonl --top 5
+redacit stats privacy_audit.jsonl --top 5
 ```
 
 ### REST API endpoints (when server is running)
@@ -434,10 +434,10 @@ curl http://localhost:8000/health
 
 ## Configuration
 
-Project config is in `pyproject.toml` under `[tool.wrapper-llm]`:
+Project config is in `pyproject.toml` under `[tool.redacit]`:
 
 ```toml
-[tool.wrapper-llm]
+[tool.redacit]
 model = "{model}"
 score_threshold = 0.4
 entities = [...]

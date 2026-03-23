@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from privacy_wrapper.anonymizer import Anonymizer
-from privacy_wrapper.client.privacy_client import (
+from redacit.anonymizer import Anonymizer
+from redacit.client.privacy_client import (
     PrivacyClient,
     _detect_adapter,
     _AnthropicAdapter,
@@ -18,7 +18,7 @@ from privacy_wrapper.client.privacy_client import (
     _GeminiAdapter,
     _OpenAIAdapter,
 )
-from privacy_wrapper.session import PrivacySession
+from redacit.session import PrivacySession
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ class TestDetection:
         assert isinstance(adapter, _GeminiAdapter)
 
     def test_unknown_raises(self):
-        from privacy_wrapper._types import UnsupportedProviderError
+        from redacit._types import UnsupportedProviderError
 
         client = _make_mock_client("cohere.client", "Client")
         anon = Anonymizer()
