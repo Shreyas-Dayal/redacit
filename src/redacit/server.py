@@ -1,5 +1,5 @@
 """
-FastAPI server for wrapper-llm.
+FastAPI server for redacit.
 
 Endpoints:
     GET  /health        — liveness check
@@ -8,9 +8,9 @@ Endpoints:
     POST /chat          — proxy OpenAI chat with automatic PII anonymization
 
 Start with:
-    wrapper-llm serve
+    redacit serve
     # or directly:
-    uvicorn privacy_wrapper.server:app --reload
+    uvicorn redacit.server:app --reload
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "FastAPI is required to run the server. "
-        "Install with: uv add 'wrapper-llm[server]'"
+        "Install with: uv add 'redacit[server]'"
     ) from exc
 
 from .anonymizer import Anonymizer
@@ -38,9 +38,9 @@ def _get_anonymizer() -> Anonymizer:
 
 
 app = FastAPI(
-    title="wrapper-llm",
+    title="redacit",
     description="Privacy-preserving LLM proxy with PII anonymization.",
-    version=_pkg_version("wrapper-llm"),
+    version=_pkg_version("redacit"),
 )
 
 

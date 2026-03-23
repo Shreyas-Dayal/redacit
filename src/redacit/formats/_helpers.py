@@ -5,7 +5,7 @@ All four functions are moved verbatim from demo.py with one change:
 anonymize_flat() receives the Anonymizer as an argument instead of
 closing over a module-level global, making it testable in isolation.
 
-Not part of the public API — import from privacy_wrapper.formats instead.
+Not part of the public API — import from redacit.formats instead.
 """
 
 from __future__ import annotations

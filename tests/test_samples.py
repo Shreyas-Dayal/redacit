@@ -4,7 +4,7 @@ Each sample is run through the full anonymize → deanonymize cycle.
 """
 
 import pytest
-from privacy_wrapper.anonymizer import Anonymizer
+from redacit.anonymizer import Anonymizer
 from fixtures.sample_prompts import SAMPLES
 
 

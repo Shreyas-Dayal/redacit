@@ -16,7 +16,7 @@ from typing import Iterator, Protocol, TypedDict, runtime_checkable
 # ---------------------------------------------------------------------------
 
 class PrivacyWrapperError(Exception):
-    """Base exception for all wrapper-llm errors."""
+    """Base exception for all redacit errors."""
 
 
 class UnsupportedProviderError(PrivacyWrapperError):

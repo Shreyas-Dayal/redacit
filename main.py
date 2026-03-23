@@ -1,4 +1,4 @@
-from privacy_wrapper.cli import app
+from redacit.cli import app
 
 if __name__ == "__main__":
     app()

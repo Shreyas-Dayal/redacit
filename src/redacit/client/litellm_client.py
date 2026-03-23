@@ -11,7 +11,7 @@ LiteLLMPrivacyClient._call() is first invoked, with a clear install
 message pointing to the correct optional extra.
 
 Usage:
-    from privacy_wrapper import LiteLLMPrivacyClient
+    from redacit import LiteLLMPrivacyClient
 
     client = LiteLLMPrivacyClient("anthropic/claude-opus-4-6")
     response = client.chat("Summarize this for Alice at alice@acme.com")
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 _INSTALL_MSG = (
     "litellm is required for LiteLLMPrivacyClient. "
-    "Install it with:  uv add 'wrapper-llm[litellm]'"
+    "Install it with:  uv add 'redacit[litellm]'"
 )
 
 

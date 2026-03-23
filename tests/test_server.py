@@ -9,7 +9,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 
-from privacy_wrapper.server import app
+from redacit.server import app
 
 client = TestClient(app)
 

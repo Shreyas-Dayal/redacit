@@ -1,11 +1,11 @@
 """
-CLI entry point for wrapper-llm.
+CLI entry point for redacit.
 
 Usage:
-    wrapper-llm init
-    wrapper-llm anonymize "John Smith called 555-1234"
-    wrapper-llm serve --host 0.0.0.0 --port 8000
-    wrapper-llm stats audit.jsonl
+    redacit init
+    redacit anonymize "John Smith called 555-1234"
+    redacit serve --host 0.0.0.0 --port 8000
+    redacit stats audit.jsonl
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Any
 import typer
 
 app = typer.Typer(
-    name="wrapper-llm",
+    name="redacit",
     help="Privacy-preserving LLM wrapper with PII anonymization.",
     no_args_is_help=True,
 )
@@ -123,7 +123,7 @@ def _collect_packages(model: str, provider: str, server: bool) -> list[str]:
 
 
 def _install_packages(packages: list[str]) -> None:
-    """Install packages directly without re-installing wrapper-llm itself."""
+    """Install packages directly without re-installing redacit itself."""
     if not packages:
         return
     uv = shutil.which("uv")
@@ -136,17 +136,17 @@ def _install_packages(packages: list[str]) -> None:
 
 
 def _write_config(config: dict[str, Any], path: Path) -> None:
-    """Append [tool.wrapper-llm] section to pyproject.toml."""
+    """Append [tool.redacit] section to pyproject.toml."""
     if path.exists():
         with open(path, "rb") as f:
             data = tomllib.load(f)
-        if data.get("tool", {}).get("wrapper-llm"):
-            typer.echo("  [tool.wrapper-llm] already exists — overwriting.")
+        if data.get("tool", {}).get("redacit"):
+            typer.echo("  [tool.redacit] already exists — overwriting.")
             lines = path.read_text().splitlines(keepends=True)
             out: list[str] = []
             skip = False
             for line in lines:
-                if line.strip() == "[tool.wrapper-llm]":
+                if line.strip() == "[tool.redacit]":
                     skip = True
                     continue
                 if skip and line.strip().startswith("["):
@@ -155,7 +155,7 @@ def _write_config(config: dict[str, Any], path: Path) -> None:
                     out.append(line)
             path.write_text("".join(out))
 
-    section = "\n[tool.wrapper-llm]\n"
+    section = "\n[tool.redacit]\n"
     for key, value in config.items():
         if isinstance(value, list):
             section += f"{key} = [\n"
@@ -182,7 +182,7 @@ def init(
     no_install: bool = typer.Option(False, "--no-install", help="Skip dependency installation."),
     agent: str = typer.Option(None, "--agent", help="AI agent file: claude, codex, antigravity, cursor, copilot, all, none."),
 ) -> None:
-    """Interactive setup wizard for wrapper-llm."""
+    """Interactive setup wizard for redacit."""
     from ._init_templates import (
         AGENT_CHOICES,
         build_agent_instructions,
@@ -191,7 +191,7 @@ def init(
         write_examples,
     )
 
-    typer.echo("\n  wrapper-llm setup\n")
+    typer.echo("\n  redacit setup\n")
 
     # -- Resolve each setting: CLI flag > interactive prompt > default ------
 
@@ -252,7 +252,7 @@ def init(
         pyproject.write_text('[project]\nname = "my-project"\nversion = "0.1.0"\n')
 
     _write_config(config, pyproject)
-    typer.echo(f"  Config written to {pyproject} [tool.wrapper-llm]")
+    typer.echo(f"  Config written to {pyproject} [tool.redacit]")
 
     # -- AI agent instructions file ----------------------------------------
 
@@ -337,7 +337,7 @@ def anonymize(
     ),
 ) -> None:
     """Anonymize PII in TEXT and print the result."""
-    from privacy_wrapper.anonymizer import Anonymizer
+    from redacit.anonymizer import Anonymizer
 
     anon = Anonymizer()
     result = anon.anonymize(text, entities=entities or None, score_threshold=threshold)
@@ -367,15 +367,15 @@ def serve(
     if missing:
         typer.echo(
             f"{', '.join(missing)} is required to run the server.\n"
-            "Install with: uv add 'wrapper-llm[server]'",
+            "Install with: uv add 'redacit[server]'",
             err=True,
         )
         raise typer.Exit(1)
 
     import uvicorn  # noqa: PLC0415 — guarded above
 
-    typer.echo(f"Starting wrapper-llm server on http://{host}:{port}")
-    uvicorn.run("privacy_wrapper.server:app", host=host, port=port, reload=reload)
+    typer.echo(f"Starting redacit server on http://{host}:{port}")
+    uvicorn.run("redacit.server:app", host=host, port=port, reload=reload)
 
 
 def _missing(pkg: str) -> bool:

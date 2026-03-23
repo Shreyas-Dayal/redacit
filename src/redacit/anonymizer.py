@@ -105,7 +105,7 @@ def _build_nlp_engine(model: str | None, language: str) -> SpacyNlpEngine:
         _log.warning(
             "No spaCy NER model found — PERSON, LOCATION, and ORGANIZATION "
             "detection is disabled. Install a model with: "
-            "pip install 'wrapper-llm[model-sm]'"
+            "pip install 'redacit[model-sm]'"
         )
         return _LoadedSpacyNlpEngine(spacy.blank(language))
 
@@ -170,7 +170,7 @@ _cached_project_config: dict | None = None
 
 
 def _load_project_config() -> dict:
-    """Load ``[tool.wrapper-llm]`` from ``pyproject.toml`` if it exists.
+    """Load ``[tool.redacit]`` from ``pyproject.toml`` if it exists.
 
     The result is cached after the first call so repeated ``Anonymizer()``
     instantiations (e.g. in tests) don't re-read the file each time.
@@ -180,7 +180,7 @@ def _load_project_config() -> dict:
        The lookup uses the **current working directory** at the time of the
        first call.  In deployed applications where the CWD differs from the
        project root, the config will not be found — pass settings explicitly
-       via constructor arguments or :func:`privacy_wrapper.configure` instead.
+       via constructor arguments or :func:`redacit.configure` instead.
     """
     global _cached_project_config
     if _cached_project_config is not None:
@@ -193,7 +193,7 @@ def _load_project_config() -> dict:
     try:
         with open(path, "rb") as f:
             data = tomllib.load(f)
-        _cached_project_config = data.get("tool", {}).get("wrapper-llm", {})
+        _cached_project_config = data.get("tool", {}).get("redacit", {})
     except Exception:
         _cached_project_config = {}
     return _cached_project_config

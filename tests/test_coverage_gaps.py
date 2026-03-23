@@ -13,12 +13,12 @@ from pathlib import Path
 
 import pytest
 
-import privacy_wrapper
-from privacy_wrapper import anonymize, deanonymize
-from privacy_wrapper.anonymizer import Anonymizer, AnonymizationResult
-from privacy_wrapper._types import ModelNotFoundError
-from privacy_wrapper.audit import AuditLogger
-from privacy_wrapper.session import PrivacySession
+import redacit
+from redacit import anonymize, deanonymize
+from redacit.anonymizer import Anonymizer, AnonymizationResult
+from redacit._types import ModelNotFoundError
+from redacit.audit import AuditLogger
+from redacit.session import PrivacySession
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ class TestAuditLogFormat:
 class TestCsvAnonymizer:
 
     def test_anonymize_csv_file(self, tmp_path):
-        from privacy_wrapper.formats.csv import CsvAnonymizer
+        from redacit.formats.csv import CsvAnonymizer
 
         csv_content = "name,email,amount\nAlice,alice@corp.com,500\nBob,bob@test.com,300\n"
         csv_path = tmp_path / "test.csv"
@@ -229,7 +229,7 @@ class TestCsvAnonymizer:
         assert "alice@corp.com" not in row0.anonymized["email"]
 
     def test_skip_field(self, tmp_path):
-        from privacy_wrapper.formats.csv import CsvAnonymizer
+        from redacit.formats.csv import CsvAnonymizer
 
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("name,amount\nAlice,500\n")
@@ -239,7 +239,7 @@ class TestCsvAnonymizer:
         assert results[0].anonymized["amount"] == "500"
 
     def test_flat_mapping_property(self, tmp_path):
-        from privacy_wrapper.formats.csv import CsvAnonymizer
+        from redacit.formats.csv import CsvAnonymizer
 
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("email\nalice@corp.com\n")
@@ -257,7 +257,7 @@ class TestCsvAnonymizer:
 class TestJsonAnonymizer:
 
     def test_anonymize_json_file(self, tmp_path):
-        from privacy_wrapper.formats.json_format import JsonAnonymizer
+        from redacit.formats.json_format import JsonAnonymizer
 
         records = [
             {"name": "Alice", "email": "alice@corp.com"},
@@ -272,7 +272,7 @@ class TestJsonAnonymizer:
         assert "alice@corp.com" not in json.dumps(results[0].anonymized)
 
     def test_nested_json(self, tmp_path):
-        from privacy_wrapper.formats.json_format import JsonAnonymizer
+        from redacit.formats.json_format import JsonAnonymizer
 
         records = [{"person": {"name": "Alice", "contact": {"email": "alice@corp.com"}}}]
         json_path = tmp_path / "test.json"
@@ -284,7 +284,7 @@ class TestJsonAnonymizer:
         assert "alice@corp.com" in flat.values()
 
     def test_non_string_values_preserved(self, tmp_path):
-        from privacy_wrapper.formats.json_format import JsonAnonymizer
+        from redacit.formats.json_format import JsonAnonymizer
 
         records = [{"name": "Alice", "age": 30, "active": True, "score": None}]
         json_path = tmp_path / "test.json"
@@ -298,8 +298,8 @@ class TestJsonAnonymizer:
         assert r["score"] is None
 
     def test_roundtrip_no_collision(self, tmp_path):
-        from privacy_wrapper.formats.json_format import JsonAnonymizer
-        from privacy_wrapper.formats._helpers import flatten
+        from redacit.formats.json_format import JsonAnonymizer
+        from redacit.formats._helpers import flatten
 
         records = [
             {
@@ -332,7 +332,7 @@ class TestJsonAnonymizer:
 class TestStreaming:
 
     def test_stream_yields_deanonymized_text(self):
-        from privacy_wrapper.client.base import BaseLLMClient
+        from redacit.client.base import BaseLLMClient
 
         class EchoClient(BaseLLMClient):
             def _call(self, prompt, system):
@@ -344,7 +344,7 @@ class TestStreaming:
         assert "alice@example.com" in chunks[0]
 
     def test_stream_with_session(self):
-        from privacy_wrapper.client.base import BaseLLMClient
+        from redacit.client.base import BaseLLMClient
 
         class EchoClient(BaseLLMClient):
             def _call(self, prompt, system):
@@ -356,7 +356,7 @@ class TestStreaming:
         assert len(session) > 0
 
     def test_stream_multi_chunk(self):
-        from privacy_wrapper.client.base import BaseLLMClient
+        from redacit.client.base import BaseLLMClient
 
         class ChunkyClient(BaseLLMClient):
             def _call(self, prompt, system):
@@ -382,33 +382,33 @@ class TestConfigure:
 
     def teardown_method(self):
         # Reset to default after each test
-        privacy_wrapper._default_anonymizer = None
-        privacy_wrapper._default_model = "auto"
-        from privacy_wrapper.anonymizer import reset_config_cache
+        redacit._default_anonymizer = None
+        redacit._default_model = "auto"
+        from redacit.anonymizer import reset_config_cache
         reset_config_cache()
 
     def test_configure_sets_model(self):
-        privacy_wrapper.configure(model=None)
-        result = privacy_wrapper.anonymize("Call John Smith please.")
+        redacit.configure(model=None)
+        result = redacit.anonymize("Call John Smith please.")
         # model=None → regex-only, person names not detected
         assert result.anonymized_text == "Call John Smith please."
 
     def test_configure_auto_detects(self):
-        privacy_wrapper.configure(model="auto")
-        result = privacy_wrapper.anonymize("Email alice@example.com")
+        redacit.configure(model="auto")
+        result = redacit.anonymize("Email alice@example.com")
         assert "alice@example.com" not in result.anonymized_text
 
     def test_configure_resets_cached_anonymizer(self):
         # First call creates an Anonymizer
-        privacy_wrapper.anonymize("test")
-        assert privacy_wrapper._default_anonymizer is not None
+        redacit.anonymize("test")
+        assert redacit._default_anonymizer is not None
 
         # configure() should reset it
-        privacy_wrapper.configure(model=None)
-        assert privacy_wrapper._default_anonymizer is None
+        redacit.configure(model=None)
+        assert redacit._default_anonymizer is None
 
         # Next call creates a new one with the new model
-        result = privacy_wrapper.anonymize("Call John Smith please.")
+        result = redacit.anonymize("Call John Smith please.")
         assert result.anonymized_text == "Call John Smith please."
 
 
@@ -423,7 +423,7 @@ class TestModelNotFoundError:
             Anonymizer(model="en_core_web_nonexistent_model_xyz")
 
     def test_error_is_subclass_of_base(self):
-        from privacy_wrapper._types import PrivacyWrapperError
+        from redacit._types import PrivacyWrapperError
 
         with pytest.raises(PrivacyWrapperError):
             Anonymizer(model="en_core_web_nonexistent_model_xyz")
@@ -436,14 +436,14 @@ class TestModelNotFoundError:
 class TestPrivacyOpenAI:
 
     def test_import_works(self):
-        from privacy_wrapper import PrivacyOpenAI
+        from redacit import PrivacyOpenAI
         assert PrivacyOpenAI is not None
 
     def test_getattr_delegates(self):
-        from privacy_wrapper.client.openai_client import PrivacyOpenAI, _PrivacyChat
+        from redacit.client.openai_client import PrivacyOpenAI, _PrivacyChat
         from unittest.mock import patch, MagicMock
 
-        with patch("privacy_wrapper.client.openai_client.OpenAI") as MockOpenAI:
+        with patch("redacit.client.openai_client.OpenAI") as MockOpenAI:
             mock_instance = MagicMock()
             MockOpenAI.return_value = mock_instance
             mock_instance.chat.completions = MagicMock()

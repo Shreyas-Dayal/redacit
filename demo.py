@@ -40,8 +40,8 @@ import json
 import sys
 from pathlib import Path
 
-from privacy_wrapper.anonymizer import Anonymizer
-from privacy_wrapper.formats import CsvAnonymizer, JsonAnonymizer
+from redacit.anonymizer import Anonymizer
+from redacit.formats import CsvAnonymizer, JsonAnonymizer
 
 DEMO_DATA_DIR = Path(__file__).parent / "demo_data"
 WIDTH = 72
@@ -146,7 +146,7 @@ def run_json(stem: str) -> None:
 
         if rec_result.flat_mapping:
             print("\nMapping:")
-            from privacy_wrapper.formats._helpers import flatten
+            from redacit.formats._helpers import flatten
             flat_orig = flatten(rec_result.original)
             for path_ in flat_orig:
                 matching = {
@@ -157,7 +157,7 @@ def run_json(stem: str) -> None:
                     print(f"  {path_:<36} {matching}")
 
         # Roundtrip check: restore each string leaf and compare
-        from privacy_wrapper.formats._helpers import flatten as _flatten
+        from redacit.formats._helpers import flatten as _flatten
         flat_orig = _flatten(rec_result.original)
         flat_anon = _flatten(rec_result.anonymized)
         for path_ in flat_orig:

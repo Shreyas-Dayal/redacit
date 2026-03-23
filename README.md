@@ -1,4 +1,4 @@
-# wrapper-llm
+# redacit
 
 A local privacy layer that anonymizes sensitive data before it reaches a cloud LLM, then restores original values in the response. No data leaves your machine as-is. No Docker required.
 
@@ -51,10 +51,10 @@ Your app  (receives the reply with real names / emails / etc. restored)
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-pip install wrapper-llm                  # base install — regex-only PII detection
-pip install "wrapper-llm[model-sm]"      # + person names, locations (11 MB)
-pip install "wrapper-llm[model-md]"      # + word vectors for better accuracy (43 MB, recommended)
-pip install "wrapper-llm[model-lg]"      # + max NER accuracy (560 MB)
+pip install redacit                  # base install — regex-only PII detection
+pip install "redacit[model-sm]"      # + person names, locations (11 MB)
+pip install "redacit[model-md]"      # + word vectors for better accuracy (43 MB, recommended)
+pip install "redacit[model-lg]"      # + max NER accuracy (560 MB)
 ```
 
 Copy `.env.example` to `.env` and add your API key for live LLM calls:
@@ -68,21 +68,21 @@ cp .env.example .env
 
 ## Model options
 
-wrapper-llm auto-detects the best available spaCy model at startup. No configuration needed — it just uses whatever is installed.
+redacit auto-detects the best available spaCy model at startup. No configuration needed — it just uses whatever is installed.
 
 | Install command | Model | Size | Detects |
 |---|---|---|---|
-| `pip install wrapper-llm` | none (regex-only) | 0 MB | emails, SSNs, credit cards, phones, IBANs, API keys, bank accounts, EINs, URLs, IPs |
-| `pip install "wrapper-llm[model-sm]"` | en_core_web_sm | 11 MB | + person names, locations, organizations |
-| `pip install "wrapper-llm[model-md]"` | en_core_web_md | 43 MB | + word vectors for better NER accuracy (recommended) |
-| `pip install "wrapper-llm[model-lg]"` | en_core_web_lg | 560 MB | + marginally better accuracy over md |
+| `pip install redacit` | none (regex-only) | 0 MB | emails, SSNs, credit cards, phones, IBANs, API keys, bank accounts, EINs, URLs, IPs |
+| `pip install "redacit[model-sm]"` | en_core_web_sm | 11 MB | + person names, locations, organizations |
+| `pip install "redacit[model-md]"` | en_core_web_md | 43 MB | + word vectors for better NER accuracy (recommended) |
+| `pip install "redacit[model-lg]"` | en_core_web_lg | 560 MB | + marginally better accuracy over md |
 
 For most use cases, `model-md` is the best balance of size and accuracy. Use `model-sm` for minimal footprint, or the base install for structured-PII-only use cases (financial data, API key scrubbing).
 
 You can also select the model explicitly in code:
 
 ```python
-from privacy_wrapper import Anonymizer
+from redacit import Anonymizer
 
 anon = Anonymizer()                          # auto-detect best available
 anon = Anonymizer(model="en_core_web_sm")    # explicit small model
@@ -96,7 +96,7 @@ anon = Anonymizer(model=None)                # regex-only, no NLP model
 ### 1. CLI — no code needed
 
 ```bash
-wrapper-llm anonymize "Schedule a call with John Smith at john@acme.com"
+redacit anonymize "Schedule a call with John Smith at john@acme.com"
 
 # Anonymized:
 # Schedule a call with <PERSON_0> at <EMAIL_ADDRESS_0>
@@ -109,21 +109,21 @@ wrapper-llm anonymize "Schedule a call with John Smith at john@acme.com"
 Filter entity types or tune the confidence threshold:
 
 ```bash
-wrapper-llm anonymize "John Smith, card 4111-1111-1111-1111" --entity PERSON
-wrapper-llm anonymize "..." --threshold 0.6
+redacit anonymize "John Smith, card 4111-1111-1111-1111" --entity PERSON
+redacit anonymize "..." --threshold 0.6
 ```
 
 Analyse an audit log:
 
 ```bash
-wrapper-llm stats privacy_audit.jsonl --top 5
+redacit stats privacy_audit.jsonl --top 5
 ```
 
 Start the REST API server (requires the `server` extra):
 
 ```bash
-uv add 'wrapper-llm[server]'
-wrapper-llm serve --host 0.0.0.0 --port 8000
+uv add 'redacit[server]'
+redacit serve --host 0.0.0.0 --port 8000
 ```
 
 ---
@@ -138,7 +138,7 @@ from openai import OpenAI
 client = OpenAI()
 
 # After
-from privacy_wrapper import PrivacyOpenAI
+from redacit import PrivacyOpenAI
 client = PrivacyOpenAI()
 
 # Everything else stays identical
@@ -157,7 +157,7 @@ Tools, `response_format`, streaming, embeddings, and all other SDK call patterns
 ### 3. Simple chat client (OpenAI)
 
 ```python
-from privacy_wrapper import OpenAIPrivacyClient
+from redacit import OpenAIPrivacyClient
 
 client = OpenAIPrivacyClient()    # reads OPENAI_API_KEY from env
 reply  = client.chat("Draft a letter to John Smith at john@acme.com")
@@ -174,7 +174,7 @@ for chunk in client.stream("Summarise the following contract: ..."):
 ### 3b. Unified client — any SDK
 
 ```python
-from privacy_wrapper import PrivacyClient
+from redacit import PrivacyClient
 from openai import OpenAI              # or anthropic.Anthropic, google.genai.Client
 
 client = PrivacyClient(OpenAI())
@@ -187,7 +187,7 @@ reply  = client.query("Draft a letter to John Smith at john@acme.com")
 ### 4. Low-level anonymizer (manage the LLM call yourself)
 
 ```python
-from privacy_wrapper import anonymize, deanonymize
+from redacit import anonymize, deanonymize
 
 result   = anonymize("SSN: 346-12-5678, card: 4111-1111-1111-1111")
 raw      = your_llm_call(result.anonymized_text)
@@ -207,7 +207,7 @@ result = anonymize(text, entities=["PERSON", "EMAIL_ADDRESS"])
 `PrivacySession` accumulates the placeholder-to-original mapping across turns so PII introduced in one message stays resolvable in later responses:
 
 ```python
-from privacy_wrapper import OpenAIPrivacyClient, PrivacySession
+from redacit import OpenAIPrivacyClient, PrivacySession
 
 session = PrivacySession()
 client  = OpenAIPrivacyClient(session=session)
@@ -249,7 +249,7 @@ Full OpenAPI docs available at `http://localhost:8000/docs` when the server is r
 ### 7. Structured data — CSV and JSON files
 
 ```python
-from privacy_wrapper import CsvAnonymizer, JsonAnonymizer
+from redacit import CsvAnonymizer, JsonAnonymizer
 
 # CSV — one result per row
 for row in CsvAnonymizer().anonymize_file("customers.csv"):
@@ -289,7 +289,7 @@ Add a sidecar config file to control per-column or per-path rules:
 `AuditLogger` writes append-only JSONL. Raw text and mapping values are **never** stored — only metadata safe for compliance review:
 
 ```python
-from privacy_wrapper import OpenAIPrivacyClient, AuditLogger
+from redacit import OpenAIPrivacyClient, AuditLogger
 
 with AuditLogger("privacy_audit.jsonl") as log:
     client = OpenAIPrivacyClient(audit_logger=log)
@@ -309,7 +309,7 @@ with AuditLogger("privacy_audit.jsonl") as log:
 Analyse a log file from the CLI:
 
 ```bash
-wrapper-llm stats privacy_audit.jsonl
+redacit stats privacy_audit.jsonl
 
 # Audit log : privacy_audit.jsonl
 # Records   : 142
@@ -365,14 +365,14 @@ uv run pytest tests/test_samples.py  # data-driven leakage and roundtrip tests
 ## Project structure
 
 ```
-wrapper-llm/
-├── src/privacy_wrapper/
+redacit/
+├── src/redacit/
 │   ├── __init__.py             # public API — all exports live here
 │   ├── anonymizer.py           # core PII detection and placeholder replacement
 │   ├── _types.py               # FieldConfig, SidecarConfig, LLMClient protocol
 │   ├── session.py              # PrivacySession — multi-turn mapping accumulator
 │   ├── audit.py                # AuditLogger — append-only JSONL compliance log
-│   ├── cli.py                  # wrapper-llm CLI (anonymize / serve / stats)
+│   ├── cli.py                  # redacit CLI (anonymize / serve / stats)
 │   ├── server.py               # FastAPI server (optional — requires [server] extra)
 │   ├── client/
 │   │   ├── base.py             # BaseLLMClient — anonymize → call → deanonymize lifecycle
@@ -404,8 +404,8 @@ wrapper-llm/
 
 | Extra | Installs | Enables |
 |---|---|---|
-| `wrapper-llm[server]` | fastapi, uvicorn | `wrapper-llm serve`, REST API |
-| `wrapper-llm[litellm]` | litellm | `LiteLLMPrivacyClient` (Anthropic, Gemini, Ollama, …) |
+| `redacit[server]` | fastapi, uvicorn | `redacit serve`, REST API |
+| `redacit[litellm]` | litellm | `LiteLLMPrivacyClient` (Anthropic, Gemini, Ollama, …) |
 
 ---
 

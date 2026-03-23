@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from privacy_wrapper.cli import app
+from redacit.cli import app
 
 runner = CliRunner()
 
@@ -175,7 +175,7 @@ class TestInitCommand:
 
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
-        cfg = data["tool"]["wrapper-llm"]
+        cfg = data["tool"]["redacit"]
         assert cfg["model"] == "en_core_web_md"
         assert cfg["score_threshold"] == 0.4
         assert "EMAIL_ADDRESS" in cfg["entities"]
@@ -192,7 +192,7 @@ class TestInitCommand:
 
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
-        cfg = data["tool"]["wrapper-llm"]
+        cfg = data["tool"]["redacit"]
         assert cfg["model"] == "none"
 
     def test_creates_pyproject_if_missing(self, tmp_path, monkeypatch):
@@ -205,7 +205,7 @@ class TestInitCommand:
         assert pyproject.exists()
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
-        assert "wrapper-llm" in data.get("tool", {})
+        assert "redacit" in data.get("tool", {})
 
     def test_examples_generated_for_openai(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -272,7 +272,7 @@ class TestInitAgentFile:
         claude_md = tmp_path / "CLAUDE.md"
         assert claude_md.exists()
         content = claude_md.read_text()
-        assert "wrapper-llm" in content
+        assert "redacit" in content
         assert "PrivacyClient" in content
         assert "Never bypass" in content
 
@@ -292,7 +292,7 @@ class TestInitAgentFile:
         assert result.exit_code == 0
         path = tmp_path / ".github" / "copilot-instructions.md"
         assert path.exists()
-        assert "wrapper-llm" in path.read_text()
+        assert "redacit" in path.read_text()
 
     def test_codex_agents_md_generated(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -302,7 +302,7 @@ class TestInitAgentFile:
         assert result.exit_code == 0
         agents_md = tmp_path / "AGENTS.md"
         assert agents_md.exists()
-        assert "wrapper-llm" in agents_md.read_text()
+        assert "redacit" in agents_md.read_text()
 
     def test_antigravity_gemini_md_generated(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)

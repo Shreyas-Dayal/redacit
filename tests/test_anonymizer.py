@@ -1,5 +1,5 @@
 import pytest
-from privacy_wrapper.anonymizer import Anonymizer, AnonymizationResult
+from redacit.anonymizer import Anonymizer, AnonymizationResult
 
 
 @pytest.fixture(scope="module")
@@ -140,15 +140,15 @@ class TestModelSelection:
         assert result.anonymized_text == "Call John Smith please."
 
     def test_config_from_pyproject(self, tmp_path, monkeypatch):
-        """Anonymizer reads [tool.wrapper-llm] from pyproject.toml."""
-        from privacy_wrapper.anonymizer import reset_config_cache
+        """Anonymizer reads [tool.redacit] from pyproject.toml."""
+        from redacit.anonymizer import reset_config_cache
 
         monkeypatch.chdir(tmp_path)
         reset_config_cache()
         pyproject = tmp_path / "pyproject.toml"
         pyproject.write_text(
             '[project]\nname = "test"\n\n'
-            "[tool.wrapper-llm]\n"
+            "[tool.redacit]\n"
             'model = "none"\n'
             "score_threshold = 0.8\n"
         )
