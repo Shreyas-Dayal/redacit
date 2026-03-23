@@ -15,15 +15,15 @@ from typing import Iterator, Protocol, TypedDict, runtime_checkable
 # Exceptions
 # ---------------------------------------------------------------------------
 
-class PrivacyWrapperError(Exception):
+class RedacitError(Exception):
     """Base exception for all redacit errors."""
 
 
-class UnsupportedProviderError(PrivacyWrapperError):
+class UnsupportedProviderError(RedacitError):
     """Raised when an SDK client type is not recognised by PrivacyClient."""
 
 
-class ModelNotFoundError(PrivacyWrapperError):
+class ModelNotFoundError(RedacitError):
     """Raised when an explicitly requested spaCy model is not installed."""
 
 

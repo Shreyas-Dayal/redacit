@@ -423,9 +423,9 @@ class TestModelNotFoundError:
             Anonymizer(model="en_core_web_nonexistent_model_xyz")
 
     def test_error_is_subclass_of_base(self):
-        from redacit._types import PrivacyWrapperError
+        from redacit._types import RedacitError
 
-        with pytest.raises(PrivacyWrapperError):
+        with pytest.raises(RedacitError):
             Anonymizer(model="en_core_web_nonexistent_model_xyz")
 
 

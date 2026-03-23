@@ -13,7 +13,7 @@ from ._types import (
     FieldConfig,
     LLMClient,
     ModelNotFoundError,
-    PrivacyWrapperError,
+    RedacitError,
     SidecarConfig,
     UnsupportedProviderError,
 )
@@ -45,7 +45,7 @@ __all__ = [
     "SidecarConfig",
     "LLMClient",
     # Exceptions
-    "PrivacyWrapperError",
+    "RedacitError",
     "UnsupportedProviderError",
     "ModelNotFoundError",
 ]
