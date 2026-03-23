@@ -53,11 +53,7 @@ _DEFAULT_ENTITIES = [
     "IBAN_CODE", "US_BANK_ACCOUNT", "US_ROUTING_NUMBER", "EIN", "API_KEY",
 ]
 
-_MODEL_PACKAGES = {
-    "en_core_web_sm": "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
-    "en_core_web_md": "en-core-web-md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
-    "en_core_web_lg": "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl",
-}
+_SPACY_MODELS = {"en_core_web_sm", "en_core_web_md", "en_core_web_lg"}
 
 _EXTRA_PACKAGES = {
     "server": ["fastapi>=0.111", "uvicorn[standard]>=0.29"],
@@ -110,16 +106,23 @@ def _prompt_entities() -> list[str]:
     return selected
 
 
-def _collect_packages(model: str, provider: str, server: bool) -> list[str]:
-    """Return pip-installable package specs based on user selections."""
+def _collect_packages(provider: str, server: bool) -> list[str]:
+    """Return pip-installable package specs (excludes spaCy models)."""
     packages: list[str] = []
-    if model in _MODEL_PACKAGES:
-        packages.append(_MODEL_PACKAGES[model])
     if server:
         packages.extend(_EXTRA_PACKAGES["server"])
     if provider == "litellm":
         packages.extend(_EXTRA_PACKAGES["litellm"])
     return packages
+
+
+def _install_spacy_model(model: str) -> None:
+    """Download a spaCy model via `python -m spacy download`."""
+    if model not in _SPACY_MODELS:
+        return
+    cmd = [sys.executable, "-m", "spacy", "download", model]
+    typer.echo(f"  Running: {' '.join(cmd)}")
+    subprocess.run(cmd, check=False)
 
 
 def _install_packages(packages: list[str]) -> None:
@@ -279,12 +282,30 @@ def init(
         for f in agent_files:
             typer.echo(f"  Agent file written: {f}")
 
-    # -- Install packages --------------------------------------------------
+    # -- Install spaCy model -----------------------------------------------
 
-    packages = _collect_packages(resolved_model, resolved_provider, resolved_server)
+    needs_model = resolved_model in _SPACY_MODELS
+    if needs_model and not no_install:
+        if yes:
+            do_model = True
+        else:
+            import questionary
+            do_model = questionary.confirm(
+                f"Download spaCy model ({resolved_model})?", default=True,
+            ).ask()
+            if do_model is None:
+                do_model = False
+        if do_model:
+            _install_spacy_model(resolved_model)
+    elif needs_model:
+        typer.echo(f"\n  To install the model: python -m spacy download {resolved_model}")
+
+    # -- Install extra packages --------------------------------------------
+
+    packages = _collect_packages(resolved_provider, resolved_server)
 
     if packages and not no_install:
-        pkg_names = [p.split("@")[0].split(">")[0].strip() for p in packages]
+        pkg_names = [p.split(">")[0].strip() for p in packages]
         if yes:
             do_install = True
         else:

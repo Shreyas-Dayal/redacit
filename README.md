@@ -52,9 +52,9 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 pip install redacit                  # base install — regex-only PII detection
-pip install "redacit[model-sm]"      # + person names, locations (11 MB)
-pip install "redacit[model-md]"      # + word vectors for better accuracy (43 MB, recommended)
-pip install "redacit[model-lg]"      # + max NER accuracy (560 MB)
+python -m spacy download en_core_web_sm          # + person names, locations (11 MB)
+python -m spacy download en_core_web_md          # + word vectors, recommended (43 MB)
+# Or use the interactive wizard: redacit init
 ```
 
 Copy `.env.example` to `.env` and add your API key for live LLM calls:
@@ -73,11 +73,11 @@ redacit auto-detects the best available spaCy model at startup. No configuration
 | Install command | Model | Size | Detects |
 |---|---|---|---|
 | `pip install redacit` | none (regex-only) | 0 MB | emails, SSNs, credit cards, phones, IBANs, API keys, bank accounts, EINs, URLs, IPs |
-| `pip install "redacit[model-sm]"` | en_core_web_sm | 11 MB | + person names, locations, organizations |
-| `pip install "redacit[model-md]"` | en_core_web_md | 43 MB | + word vectors for better NER accuracy (recommended) |
-| `pip install "redacit[model-lg]"` | en_core_web_lg | 560 MB | + marginally better accuracy over md |
+| `python -m spacy download en_core_web_sm          # + person names, locations (11 MB)
+| `python -m spacy download en_core_web_md          # + word vectors, recommended (43 MB)
+| `# Or use the interactive wizard: redacit init
 
-For most use cases, `model-md` is the best balance of size and accuracy. Use `model-sm` for minimal footprint, or the base install for structured-PII-only use cases (financial data, API key scrubbing).
+For most use cases, `en_core_web_md` is the best balance of size and accuracy. Use `en_core_web_sm` for minimal footprint, or the base install for structured-PII-only use cases (financial data, API key scrubbing).
 
 You can also select the model explicitly in code:
 
