@@ -1,5 +1,7 @@
 # redacit
 
+![Pepy Total Downloads](https://img.shields.io/pepy/dt/redacit?style=for-the-badge)
+
 A local privacy layer that anonymizes sensitive data before it reaches a cloud LLM, then restores original values in the response. No data leaves your machine as-is. No Docker required.
 
 ---
